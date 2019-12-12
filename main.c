@@ -194,7 +194,7 @@ void gameLoop()
                 /*case 0xAB:
                     z_ret()
                     break;*/
-				default:
+				default: 
 					printf("unimplemented opcode C: %d\n", opcode);
                     exit(1);
 					break;
