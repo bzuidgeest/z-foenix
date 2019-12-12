@@ -1,0 +1,1 @@
+#define byte u_int8_t
