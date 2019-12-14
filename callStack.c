@@ -15,6 +15,15 @@ void callStack_push(functionData value)
     tmp = malloc(sizeof(node));
     tmp -> data = value;
     tmp -> next = top;
+    if (top != NULL)
+    {
+        tmp -> nodeCount = top -> nodeCount + 1;
+    }
+    else
+    {
+        tmp -> nodeCount = 1;
+    }
+    
     top = tmp;
 }
 
@@ -39,3 +48,7 @@ int callStack_isEmpty()
     return top==NULL;
 }
 
+short callStack_Size()
+{
+    return top -> nodeCount;
+}
