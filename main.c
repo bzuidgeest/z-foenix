@@ -18,6 +18,7 @@ typedef u_int16_t ushort;
 void initialize(void);
 void gameLoop(void);
 void ReadInstruction();
+short loadVariable(short number);
 void StoreResult(short value);
 
 void z_get_prop_len(void);
@@ -259,21 +260,21 @@ void ReadInstruction()
                 break;
             case 1: // smallconstant variablenumber
                 operands[0] = zorkData[programCounter++];
-                operands[1] = zorkData[programCounter++];
+                operands[1] = loadVariable(zorkData[programCounter++]);
                 operandType[0] = 0x01;
                 operandType[1] = 0x02;
                 operandType[2] = 0x03;
                 break;
             case 2: // variable small
-                operands[0] = zorkData[programCounter++];
+                operands[0] = loadVariable(zorkData[programCounter++]);
                 operands[1] = zorkData[programCounter++];
                 operandType[0] = 0x02;
                 operandType[1] = 0x01;
                 operandType[2] = 0x03;
                 break;
             case 3: // variable variable
-                operands[0] = zorkData[programCounter++];
-                operands[1] = zorkData[programCounter++];
+                operands[0] = loadVariable(zorkData[programCounter++]);
+                operands[1] = loadVariable(zorkData[programCounter++]);
                 operandType[0] = 0x02;
                 operandType[1] = 0x02;
                 operandType[2] = 0x03;
@@ -302,7 +303,7 @@ void ReadInstruction()
                 operandType[1] = 0x03;
                 break;
             case 2: // variable
-                operands[0] = zorkData[programCounter++];
+                operands[0] = loadVariable(zorkData[programCounter++]);
                 operandType[0] = 0x02;
                 operandType[1] = 0x03;
                 break;
@@ -352,16 +353,39 @@ void ReadInstruction()
             switch(operandType[i])
             {
                 case 0x0:
-                    //operands[i] = zorkData[programCounter] << 8 | zorkData[programCounter + 1];
-                    //programCounter += 2;
                     operands[i] = zorkData[programCounter++] << 8 | zorkData[programCounter++];
                     break;
                 case 0x1:
-                case 0x2:
                     operands[i] = zorkData[programCounter++];
+                    break;
+                case 0x2:
+                    // get variable number
+                    operands[i] = loadVariable(zorkData[programCounter++]);
                     break;
             }
         }
+    }
+}
+
+short loadVariable(short number)
+{
+    // change variable number to variable value for processing
+    if(number <= 0x0F)
+    {
+        if (number == 0)
+        {
+            number = stack_pop(stack);
+        }
+        else
+        {
+            // 0 is stack so 1 is first local giving an array offset of 1
+            number = callStack_top().locals[number - 1];
+        }
+    }
+    else
+    {
+        // globals start after 0x0F so offset
+        number = globals[number - 0x0F];
     }
 }
 
@@ -431,92 +455,15 @@ void branchTo(int value)
 
 void z_add(void)
 {
-	ushort a = 0;
-	ushort b = 0;
-	ushort result = 0;
-
-	if (opcode == 0x54)
-	{
-		if(operands[0] < 0x0F)
-		{
-			a = callStack_top().locals[operands[0]];
-		}
-		else
-		{
-			a = globals[operands[0] - 0x0F];
-		}
-		
-		result = a + operands[1];
-	}
-
-	if (opcode == 0x74)
-	{
-		if(operands[0] < 0x0F)
-		{
-			a = callStack_top().locals[operands[0]];
-		}
-		else
-		{
-			a = globals[operands[0] - 0x0F];
-		}
-		
-		if(operands[1] < 0x0F)
-		{
-			b = callStack_top().locals[operands[1]];
-		}
-		else
-		{
-			b = globals[operands[1] - 0x0F];
-		}
-		result = a + b;
-	}
-
-	storeResult(result);
+	// opcode == 0x54
+    // opcode == 0x74
+	storeResult(operands[0] + operands[1]);
 }
 
 void z_sub(void)
 {
-	ushort a = 0;
-	ushort b = 0;
-	ushort result = 0;
-
-	if (opcode == 0x55)
-	{
-		if(operands[0] < 0x0F)
-		{
-			a = callStack_top().locals[operands[0]];
-		}
-		else
-		{
-			a = globals[operands[0] - 0x0F];
-		}
-		
-		result = a - operands[1];
-	}
-
-/*	if (opcode == 0x74)
-	{
-		if(operands[0] < 0x0F)
-		{
-			a = callStack_top().locals[operands[0]];
-		}
-		else
-		{
-			a = globals[operands[0] - 0x0F];
-		}
-		
-		if(operands[1] < 0x0F)
-		{
-			b = callStack_top().locals[operands[1]];
-		}
-		else
-		{
-			b = globals[operands[1] - 0x0F];
-		}
-		result = a + b;
-	}*/
-
-	storeResult(result);
+	// opcode == 0x55
+	storeResult(operands[0] - operands[1]);
 }
 
 void z_call_vs(void)
@@ -563,66 +510,14 @@ void z_call_vs(void)
 
 void z_je(void)
 {
-	int a = 0;
-	int b = 0;
-	int result;
-
-	if (opcode == 0x61)
-	{
-		if(operands[0] < 0x0F)
-		{
-			a = callStack_top().locals[operands[0] - 1];
-		}
-		else
-		{
-			a = globals[operands[0] - 0x0F];
-		}
-		
-		if(operands[1] < 0x0F)
-		{
-			b = callStack_top().locals[operands[1] - 1];
-		}
-		else
-		{
-			b = globals[operands[1] - 0x0F];
-		}
-		
-		
-        branchTo(a == b);
-	}
+	// opcode == 0x61
+    branchTo(operands[0] == operands[1]);
 }
 
 void z_jz(void)
 {
-	short a = 0;
-/*
-	if (opcode == 0x61)
-	{
-		if(operands[0] < 0x0F)
-		{
-			a = callStack_top().locals[operands[0] - 1];
-		}
-		else
-		{
-			a = globals[operands[0] - 0x0F];
-		}
-		
-        branchTo(a == b);
-	}*/
-
-    if (opcode == 0xA0)
-    {
-        if(operands[0] < 0x0F)
-		{
-			a = callStack_top().locals[operands[0] - 1];
-		}
-		else
-		{
-			a = globals[operands[0] - 0x0F];
-		}
-
-        branchTo(a == 0);
-    }
+    // opcode == 0xA0
+    branchTo(operands[0] == 0);
 }
 
 void z_get_prop_len(void)
@@ -685,53 +580,9 @@ void z_storew(void)
     short wordIndex = 0;
     short value = 0;
 
-    if (operandType[0] == 0x02)
-    {
-        if(operands[0] < 0x0F)
-		{
-			array = callStack_top().locals[operands[0] - 1];
-		}
-		else
-		{
-			array = globals[operands[0] - 0x0F];
-		}
-    }
-    else
-    {
-        array = operands[0];
-    }
-    
-    if (operandType[1] == 0x02)
-    {
-        if(operands[1] < 0x0F)
-		{
-			wordIndex = callStack_top().locals[operands[0] - 1];
-		}
-		else
-		{
-			wordIndex = globals[operands[0] - 0x0F];
-		}
-    }
-    else
-    {
-        wordIndex = operands[1];
-    }
-
-    if (operandType[2] == 0x02)
-    {
-        if(operands[2] < 0x0F)
-		{
-			value = callStack_top().locals[operands[2] - 1];
-		}
-		else
-		{
-			value = globals[operands[0] - 0x0F];
-		}
-    }
-    else
-    {
-        value = operands[2];
-    }
+    array = operands[0];
+    wordIndex = operands[1];
+    value = operands[2];
     
     zorkData[array + 2 * wordIndex] = (value >> 8); 
     zorkData[array + 2 * wordIndex] = (value & 0x0F); 
