@@ -31,7 +31,7 @@ short operandType[8];
 short storeLocation;
 
 
-u_int8_t *zorkData;
+//u_int8_t *zorkData;
 extern struct header *zorkHeader;
 
 struct stack *stack;
@@ -143,6 +143,13 @@ void gameLoop()
         //currentInstruction = zorkData[programCounter++]; 
 		printf(" OPCODE: 0x%X (%d)\n", opcode, opcode);
 
+        int i = 0;
+        while (operandType[i] != 3)
+        {
+            printf("\tOperand %d value: %d(%d)\n", i, operands[i], (ushort)operands[i]);
+            i++;
+        }
+
         /* VAR instruction */
         if ((opcode & 0xC0) == 0xC0)   
         {
@@ -157,7 +164,7 @@ void gameLoop()
                         z_storew();
                         break;
                     default:
-						printf("unimplemented opcode A: %d", opcode);
+						printf("unimplemented opcode A: %X (%d)", opcode, opcode);
                         exit(1);
 						break;
                 }
@@ -219,6 +226,9 @@ void gameLoop()
         {
             case 0x04:
                 z_dec_chk();
+                break;
+            case 0x4F:
+                z_loadw();
                 break;
             case 0x54:
 			case 0x74:
@@ -369,6 +379,8 @@ void ReadInstruction()
             }
         }
     }
+
+   
 }
 
 short loadVariable(short number)
@@ -446,6 +458,7 @@ An offset of 0 means "return false from the current routine", and 1 means "retur
 
 4.7.2
 Otherwise, a branch moves execution to the instruction at address
+Address after branch data + Offset - 2.
 */
 void branchTo(int value)
 {
@@ -465,7 +478,7 @@ void branchTo(int value)
     
     if ((branchByte1 & 0xb10000000 && value == 1) || ((branchByte1 & 0xb10000000) == 0 && value == 0))
     {
-        programCounter = programCounter + branchOffset - 1;
+        programCounter = programCounter + branchOffset - 2;
     }
 
     if (branchOffset == 0)
@@ -656,7 +669,7 @@ void z_storew(void)
     }
     
     zorkData[array + 2 * wordIndex] = (value >> 8); 
-    zorkData[array + 2 * wordIndex] = (value & 0x0F); 
+    zorkData[(array + 2 * wordIndex) + 1] = (value & 0x0F); 
 }
 
 void z_new_line(void)
@@ -711,4 +724,92 @@ void z_dec_chk()
     storeVariable(variableNumber, --variableValue);
     
     branchTo(variableValue < operands[1]);
+}
+
+/*
+2OP:15 F loadw array word-index -> (result)
+
+Stores array-->word-index (i.e., the word at address array+2*word-index, which must lie in static or dynamic memory). 
+*/
+void z_loadw(void)
+{
+    ushort array = 0;
+    short wordIndex = 0;
+    short value = 0;
+
+    if (operandType[0] == 0x02)
+    {
+        array = loadVariable(operands[0]);
+    }
+    else
+    {
+        array = operands[0];
+    }
+    
+    if (operandType[1] == 0x02)
+    {
+        wordIndex = loadVariable(operands[1]);
+    }
+    else
+    {
+        wordIndex = operands[1];
+    }
+
+    value = (zorkData[array + 2 * wordIndex] << 8) + zorkData[(array + 2 * wordIndex) + 1];    
+    storeResult(value);
+}
+
+/*
+VAR:227 3 put_prop object property value
+
+Writes the given value to the given property of the given object. If the property does not exist for that object, 
+the interpreter should halt with a suitable error message. If the property length is 1, then the interpreter should 
+store only the least significant byte of the value. (For instance, storing -1 into a 1-byte property results in the property value 255.) 
+As with get_prop the property length must not be more than 2: if it is, the behaviour of the opcode is undefined. 
+*/
+void z_put_prop(void)
+{
+    ushort prop_addr;
+    short value;
+    byte mask;
+
+    if (operands[0] == 0) {
+	    printf ("Cannot put something in object 0");
+	    exit(1);
+    }
+
+    /* Property id is in bottom five or six bits */
+
+    mask = (h_version <= V3) ? 0x1f : 0x3f;
+
+    /* Load address of first property */
+
+    prop_addr = first_property (zargs[0]);
+
+    /* Scan down the property list */
+
+    for (;;) {
+	LOW_BYTE (prop_addr, value)
+	if ((value & mask) <= zargs[1])
+	    break;
+	prop_addr = next_property (prop_addr);
+    }
+
+    /* Exit if the property does not exist */
+
+    if ((value & mask) != zargs[1])
+	runtime_error (ERR_NO_PROP);
+
+    /* Store the new property value (byte or word sized) */
+
+    prop_addr++;
+
+    if ((h_version <= V3 && !(value & 0xe0)) || (h_version >= V4 && !(value & 0xc0))) {
+	zbyte v = zargs[2];
+	SET_BYTE (prop_addr, v)
+    } else {
+	zword v = zargs[2];
+	SET_WORD (prop_addr, v)
+    }
+   
 }
