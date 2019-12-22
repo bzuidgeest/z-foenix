@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include "object.h"
 #include "zip.h"
+#include "text.h"
 
 
 /*
@@ -22,11 +23,13 @@ void objecttable_initialize(ushort address, byte version)
 
     if (version < 4)
     {
-        objectlistStart = address * 31 * 2;
+        // 31 default properties * 2 bytes
+        objectlistStart = address + 62;
     }
     else
     {
-        objectlistStart = address * 63 * 2;
+        // 63 default properties * 2 bytes
+        objectlistStart = address + 126;
     }
     
 }
@@ -81,7 +84,18 @@ ushort objecttable_getObjectAddress(ushort number)
 
     if ((objecttableVersion < 4 && number <= 255) || (objecttableVersion >= 4 && number <= 65535))
     {
-        return objectlistStart + (number - 1) * 2;
+        if (objecttableVersion <= 3)
+        {
+            // first object number is one, so minus one for zero index layout. 
+            // V3 and lower have 9 bytes per entry
+            return objectlistStart + (number - 1) * 9;
+        }
+        else
+        {
+            // V4 and higher have 14 bytes per entry
+            return objectlistStart + (number - 1) * 14;
+        }
+        
     }
     else
     {
@@ -126,15 +140,15 @@ ushort objecttable_getObjectSibbling(ushort objectAddress)
     }
 }
 
-ushort objecttable_getObjectPropertiesAddress(ushort objectAddress)
+ushort objecttable_getObjectPropertyTableAddress(ushort objectAddress)
 {
     if(objecttableVersion < 4)
     {
-        return ((objectAddress + 7) << 8) + (objectAddress + 8);
+        return (zorkData[objectAddress + 7] << 8) + (zorkData[objectAddress + 8]);
     }
     else
     {
-        return ((objectAddress + 12) << 8) + (objectAddress + 13);
+        return (zorkData[objectAddress + 12] << 8) + (zorkData[objectAddress + 13]);
     }
 }
 
@@ -153,3 +167,85 @@ byte objecttable_getObjectAttribute(ushort objectAddress, ushort attributeNumber
         exit(1);
     }
 }
+
+/*
+12.4
+Each object has its own property table. Each of these can be anywhere in dynamic memory (indeed, a game can legally change an object's properties 
+table address in play, provided the new address points to another valid properties table). The header of a property table is as follows:
+
+   text-length     text of short name of object
+  -----byte----   --some even number of bytes---
+
+where the text-length is the number of 2-byte words making up the text, which is stored in the usual format. (This means that an object's short 
+name is limited to 765 Z-characters.) After the header, the properties are listed in descending numerical order. (This order is essential and is not a 
+matter of convention.)
+*/
+char * objecttable_getObjectName(ushort propertyTableAddress)
+{
+    byte length = zorkData[propertyTableAddress];
+    char *name = readText(propertyTableAddress, length);
+    return *name;
+}
+
+/*
+12.4.1
+
+In Versions 1 to 3, each property is stored as a block
+
+   size byte     the actual property data
+                ---between 1 and 8 bytes--
+
+where the size byte is arranged as 32 times the number of data bytes minus one, plus the property number. A property list is terminated by a 
+size byte of 0. (It is otherwise illegal for a size byte to be a multiple of 32.)
+
+12.4.2
+In Versions 4 and later, a property block instead has the form
+
+   size and number       the actual property data
+  --1 or 2 bytes---     --between 1 and 64 bytes--
+
+The property number occupies the bottom 6 bits of the first size byte.
+
+12.4.2.1
+If the top bit (bit 7) of the first size byte is set, then there are two size-and-number bytes as follows. In the first byte, bits 0 to 5 
+contain the property number; bit 6 is undetermined (it is clear in all Infocom or Inform story files); bit 7 is set. In the second byte, bits 0 to 5 
+contain the property data length, counting in bytes; bit 6 is undetermined (it is set in Infocom story files, but clear in Inform ones); bit 7 is always set.
+
+12.4.2.1.1
+***[1.0] A value of 0 as property data length (in the second byte) should be interpreted as a length of 64. (Inform can compile such properties.)
+
+12.4.2.2
+If the top bit (bit 7) of the first size byte is clear, then there is only one size-and-number byte. Bits 0 to 5 contain the property number; 
+bit 6 is either clear to indicate a property data length of 1, or set to indicate a length of 2; bit 7 is clear. 
+*/
+ushort objecttable_getFirstPropertyAddress(ushort objectNumber)
+{
+    ushort propertytableAddress = objecttable_getObjectPropertyTableAddress(objecttable_getObjectAddress(objectNumber));
+    // First property of an object should be start of property table + the lenght byte of the object name + object name bytes.
+    return propertytableAddress + zorkData[propertytableAddress] * 2 + 1;
+}
+
+ushort objecttable_getNextPropertyAddress(ushort propertyAddress)
+{
+    short value = zorkData[propertyAddress];
+    // add 1 for the size byte, moves to second size byte for V4+
+    propertyAddress++;
+
+    if (zorkData[0] <= 3)
+    {
+        value >>= 5;
+    }
+    else if (!(value & 0x80))
+    {
+	    value >>= 6;
+    }
+    else 
+    {
+	    value = zorkData[propertyAddress] &= 0x3f;
+	    if (value == 0) value = 64;	/* demanded by Spec 1.0 */
+    }
+
+    /* Add property length to current property pointer (lenght is stored minus 1 so +1) */
+    return propertyAddress + value + 1;
+}
+

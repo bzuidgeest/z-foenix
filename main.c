@@ -122,6 +122,8 @@ void initialize(void)
 		globals[i] = (zorkData[address] << 8) + zorkData[address + 1];
 		address += 2;
 	}
+
+    objecttable_initialize(getObjectTableLocation(), zorkHeader->version);
 }
 
 void gameLoop()
@@ -146,7 +148,7 @@ void gameLoop()
         int i = 0;
         while (operandType[i] != 3)
         {
-            printf("\tOperand %d value: %d(%d)\n", i, operands[i], (ushort)operands[i]);
+            printf("\tOperand %d value: %d(%d) type: %d\n", i, operands[i], (ushort)operands[i], operandType[i]);
             i++;
         }
 
@@ -162,6 +164,9 @@ void gameLoop()
                         break;
                     case 0xE1:
                         z_storew();
+                        break;
+                    case 0xE3:
+                        z_put_prop();
                         break;
                     default:
 						printf("unimplemented opcode A: %X (%d)", opcode, opcode);
@@ -226,6 +231,10 @@ void gameLoop()
         {
             case 0x04:
                 z_dec_chk();
+                break;
+            case 0x0D:
+            case 0x2D:
+                z_store();
                 break;
             case 0x4F:
                 z_loadw();
@@ -430,19 +439,19 @@ void storeResult(short value)
 
 void storeVariable(short location, short value)
 {
-	printf("Storing %d to %d\n", value, storeLocation);
+	printf("Storing %d to %d\n", value, location);
 
-    if (storeLocation == 0)
+    if (location == 0)
     {
         stack_push(stack, value);
     }
-    else if (storeLocation <= 15)
+    else if (location <= 15)
     {
-        callStack_top().locals[storeLocation - 1] = value;
+        callStack_top().locals[location - 1] = value;
     }
     else
     {
-        globals[storeLocation - 0x0F] = value;
+        globals[location - 0x0F] = value;
     }
 }
 
@@ -632,6 +641,36 @@ void z_get_prop_len(void)
 }
 
 /* 
+2OP:13 D store (variable) value
+Set the VARiable referenced by the operand to value. 
+*/
+void z_store(void)
+{
+    ushort variable = 0;
+    short value = 0;
+
+    if (operandType[0] == 0x02)
+    {
+        variable = loadVariable(operands[0]);
+    }
+    else
+    {
+        variable = operands[0];
+    }
+
+    if (operandType[1] == 0x02)
+    {
+        value = loadVariable(operands[1]);
+    }
+    else
+    {
+        value = operands[1];
+    }
+
+    storeVariable(variable, value);
+}
+
+/* 
 storew array word-index value
 array-->word-index = value, i.e. stores the given value in the word at address array+2*word-index (which must lie in dynamic memory). (See loadw.) 
 */
@@ -769,9 +808,9 @@ As with get_prop the property length must not be more than 2: if it is, the beha
 */
 void z_put_prop(void)
 {
-    ushort prop_addr;
+    ushort propertyAdress;
     short value;
-    byte mask;
+    byte propertyNumberMask;
 
     if (operands[0] == 0) {
 	    printf ("Cannot put something in object 0");
@@ -779,37 +818,38 @@ void z_put_prop(void)
     }
 
     /* Property id is in bottom five or six bits */
-
-    mask = (h_version <= V3) ? 0x1f : 0x3f;
+    propertyNumberMask = (zorkHeader->version <= 3) ? 0x1f : 0x3f;
 
     /* Load address of first property */
-
-    prop_addr = first_property (zargs[0]);
+    propertyAdress = objecttable_getFirstPropertyAddress(operands[0]);
 
     /* Scan down the property list */
-
-    for (;;) {
-	LOW_BYTE (prop_addr, value)
-	if ((value & mask) <= zargs[1])
-	    break;
-	prop_addr = next_property (prop_addr);
+    for (;;) 
+    {
+	    value = zorkData[propertyAdress];
+	    if ((value & propertyNumberMask) <= operands[1])
+	        break;
+	    propertyAdress = objecttable_getNextPropertyAddress(propertyAdress);
     }
 
     /* Exit if the property does not exist */
-
-    if ((value & mask) != zargs[1])
-	runtime_error (ERR_NO_PROP);
+    if ((value & propertyNumberMask) != operands[1])
+    {
+        printf("Property does not exist");
+        exit(1);
+    }
 
     /* Store the new property value (byte or word sized) */
+    // skip the length byte V1+
+    propertyAdress++;
 
-    prop_addr++;
-
-    if ((h_version <= V3 && !(value & 0xe0)) || (h_version >= V4 && !(value & 0xc0))) {
-	zbyte v = zargs[2];
-	SET_BYTE (prop_addr, v)
-    } else {
-	zword v = zargs[2];
-	SET_WORD (prop_addr, v)
+    if ((zorkHeader->version <= 3 && !(value & 0xe0)) || (zorkHeader->version >= 4 && !(value & 0xc0))) 
+    {
+	    zorkData[propertyAdress] = operands[2] & 0xFF;
+    } 
+    else 
+    {
+	    zorkData[propertyAdress] = (operands[2] >>8);
+        zorkData[propertyAdress + 1] = operands[2] & 0xFF;
     }
-   
 }
