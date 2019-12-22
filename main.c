@@ -236,6 +236,9 @@ void gameLoop()
             case 0x2D:
                 z_store();
                 break;
+            case 0x4A:
+                z_test_attr();
+                break;
             case 0x4F:
                 z_loadw();
                 break;
@@ -248,6 +251,9 @@ void gameLoop()
                 break;
 			case 0x61:
 				z_je();
+                break;
+            case 0x6E:
+				z_insert_obj();
                 break;
 			default:
 				printf("unimplemented opcode E: %d\n", opcode);
@@ -485,7 +491,7 @@ void branchTo(int value)
         branchOffset = (branchByte1 & 0b00111111);
     }
     
-    if ((branchByte1 & 0xb10000000 && value == 1) || ((branchByte1 & 0xb10000000) == 0 && value == 0))
+    if ((branchByte1 >> 7 && value == 1) || ((branchByte1 >> 7) == 0 && value == 0))
     {
         programCounter = programCounter + branchOffset - 2;
     }
@@ -852,4 +858,68 @@ void z_put_prop(void)
 	    zorkData[propertyAdress] = (operands[2] >>8);
         zorkData[propertyAdress + 1] = operands[2] & 0xFF;
     }
+}
+
+/*
+2OP:10 A test_attr object attribute ?(label)
+
+Jump if object has attribute.
+*/
+void z_test_attr(void)
+{
+    ushort object = 0;
+    byte attribute = 0;
+
+    if (operandType[0] == 0x02)
+    {
+        object = loadVariable(operands[0]);
+    }
+    else
+    {
+        object = operands[0];
+    }
+    
+    if (operandType[1] == 0x02)
+    {
+        attribute = loadVariable(operands[1]);
+    }
+    else
+    {
+        attribute = operands[1];
+    }
+
+    branchTo(objecttable_getObjectAttribute(object, attribute));
+}
+
+/*
+2OP:14 E insert_obj object destination
+
+Moves object O to become the first child of the destination object D. (Thus, after the operation the child of D is O, 
+and the sibling of O is whatever was previously the child of D.) All children of O move with it. (Initially O can be at any point in the object tree; 
+it may legally have parent zero.) 
+*/
+void z_insert_obj(void)
+{
+    ushort object = 0;
+    byte destination = 0;
+
+    if (operandType[0] == 0x02)
+    {
+        object = loadVariable(operands[0]);
+    }
+    else
+    {
+        object = operands[0];
+    }
+    
+    if (operandType[1] == 0x02)
+    {
+        destination = loadVariable(operands[1]);
+    }
+    else
+    {
+        destination = operands[1];
+    }
+
+    objecttable_insertObject(object, destination);
 }

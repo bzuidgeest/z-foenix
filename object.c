@@ -108,23 +108,50 @@ ushort objecttable_getObjectParent(ushort objectAddress)
 {
     if(objecttableVersion < 4)
     {
-        return (objectAddress + 4);
+        return zorkData[objectAddress + 4];
     }
     else
     {
-        return ((objectAddress + 6) << 8) + (objectAddress + 7);
+        return zorkData[(objectAddress + 6) << 8] + zorkData[objectAddress + 7];
     }
 }
+
+ushort objecttable_setObjectParent(ushort objectAddress, ushort value)
+{
+    if(objecttableVersion < 4)
+    {
+        zorkData[objectAddress + 4] = value & 0x0F;
+    }
+    else
+    {
+        zorkData[objectAddress + 6] = (value >> 8) & 0x0F;
+        zorkData[objectAddress + 7] = (value) & 0x0F;
+    }
+}
+
 
 ushort objecttable_getObjectChild(ushort objectAddress)
 {
     if(objecttableVersion < 4)
     {
-        return (objectAddress + 6);
+        return zorkData[objectAddress + 6];
     }
     else
     {
-        return ((objectAddress + 10) << 8) + (objectAddress + 11);
+        return zorkData[(objectAddress + 10) << 8] + zorkData[objectAddress + 11];
+    }
+}
+
+void objecttable_setObjectChild(ushort objectAddress, ushort value)
+{
+    if(objecttableVersion < 4)
+    {
+        zorkData[objectAddress + 6] = value & 0x0F;
+    }
+    else
+    {
+        zorkData[objectAddress + 10] = (value >> 8) & 0x0F;
+        zorkData[objectAddress + 11] = (value) & 0x0F;
     }
 }
 
@@ -132,11 +159,24 @@ ushort objecttable_getObjectSibbling(ushort objectAddress)
 {
     if(objecttableVersion < 4)
     {
-        return (objectAddress + 5);
+        return zorkData[objectAddress + 5];
     }
     else
     {
-        return ((objectAddress + 8) << 8) + (objectAddress + 9);
+        return zorkData[(objectAddress + 8) << 8] + zorkData[objectAddress + 9];
+    }
+}
+
+void objecttable_setObjectSibbling(ushort objectAddress, ushort value)
+{
+     if(objecttableVersion < 4)
+    {
+        zorkData[objectAddress + 5] = value & 0x0F;
+    }
+    else
+    {
+        zorkData[objectAddress + 8] = (value >> 8) & 0x0F;
+        zorkData[objectAddress + 9] = (value) & 0x0F;
     }
 }
 
@@ -152,14 +192,17 @@ ushort objecttable_getObjectPropertyTableAddress(ushort objectAddress)
     }
 }
 
-byte objecttable_getObjectAttribute(ushort objectAddress, ushort attributeNumber)
+byte objecttable_getObjectAttribute(ushort objectNumber, ushort attributeNumber)
 {
+    // get object address from object index
+    ushort objectAddres = objecttable_getObjectAddress(objectNumber);
+
     if ((objecttableVersion < 4 && attributeNumber < 32) || (objecttableVersion >= 4 && attributeNumber < 48))
     {
         // for every 8 bit get the next byte using division
         // then shift the byte modules 8 to the right to get the interesting bit at pos 0
         // then use "and" 1 to check if that bit is set and return
-        return (zorkData[objectAddress + (attributeNumber / 8)] >> (7 - (attributeNumber % 8))) & 0x01; 
+        return (zorkData[objectAddres + (attributeNumber / 8)] >> (7 - (attributeNumber % 8))) & 0x01; 
     }
     else
     {
@@ -248,4 +291,36 @@ ushort objecttable_getNextPropertyAddress(ushort propertyAddress)
     /* Add property length to current property pointer (lenght is stored minus 1 so +1) */
     return propertyAddress + value + 1;
 }
+/*
+Moves object O to become the first child of the destination object D. (Thus, after the operation the child of D is O, 
+and the sibling of O is whatever was previously the child of D.) All children of O move with it. (Initially O can be at any point in the object tree; 
+it may legally have parent zero.) 
+*/
+//parent    sibling   child 
+void objecttable_insertObject(ushort sourceObjectNumber, ushort destinationObjectNumber)
+{
+    // find object addresses for both objects
+    ushort sourceObjectAddress = objecttable_getObjectAddress(sourceObjectNumber);
+    ushort destinationObjectAddress = objecttable_getObjectAddress(destinationObjectNumber);
 
+
+    // remove object from its current location in the tree and stitch tree back together
+    ushort sourceObjectParent = objecttable_getObjectParent(sourceObjectAddress);
+    if (sourceObjectParent != 0)
+    {
+        printf("need to write tree patching code");
+        exit(1);
+    }
+
+    // get first child of destionation object
+    ushort firstChildOfDestination = objecttable_getObjectChild(destinationObjectAddress);
+    //ushort firstChildOfDestinationAddress = objecttable_getObjectAddress(firstChildOfDestination);
+    
+    // insert source object before first child of destination object
+    // make destinationobject the parent of the sourceobject
+    objecttable_setObjectParent(sourceObjectAddress, destinationObjectNumber);
+    // set destination child property to sourceobject
+    objecttable_setObjectChild(destinationObjectAddress, sourceObjectNumber);
+    // set the old first child of destination to be the sibling of sourceobject.
+    objecttable_setObjectSibbling(sourceObjectAddress, firstChildOfDestination);
+}

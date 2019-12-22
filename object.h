@@ -21,6 +21,9 @@ ushort objecttable_getObjectSibbling(ushort objectAddress);
 ushort objecttable_getObjectPropertyTableAddress(ushort objectAddress);
 byte objecttable_getObjectAttribute(ushort objectAddress, ushort attributeNumber);
 
+
+
 char * objecttable_getObjectName(ushort propertyTableAddress);
 ushort objecttable_getFirstPropertyAddress(ushort objectAddress);
 ushort objecttable_getNextPropertyAddress(ushort propertyAddress);
+void objecttable_insertObject(ushort sourceObjectNumber, ushort destinationObjectNumber);
