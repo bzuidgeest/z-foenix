@@ -92,7 +92,7 @@ int main()
     zorkHeader = zorkData;
 
     u_int16_t a = getInitialProgramCounter();
-    u_int16_t b = getInitialProgramCounter();
+    u_int16_t b = getRelease();
 
     u_int16_t c = getObjectTableLocation();
     u_int16_t d = getGlobalVariableLocation();
@@ -124,6 +124,7 @@ void initialize(void)
 	}
 
     objecttable_initialize(getObjectTableLocation(), zorkHeader->version);
+    text_initialize(zorkHeader->version, getAbbreviationsLocation());
 }
 
 void gameLoop()
@@ -168,6 +169,9 @@ void gameLoop()
                     case 0xE3:
                         z_put_prop();
                         break;
+                    case 0xE6:
+                        z_print_num();
+                        break;
                     default:
 						printf("unimplemented opcode A: %X (%d)", opcode, opcode);
                         exit(1);
@@ -177,9 +181,16 @@ void gameLoop()
             }
             else
             {
-				printf("unimplemented opcode B: %d", opcode);
-                exit(1);
-				break;
+                switch(opcode)
+                {
+                    case 0xC9:
+                        z_add();
+                        break;
+                    default:
+				        printf("unimplemented opcode B: %d", opcode);
+                        exit(1);
+				        break;
+                }
             }
              
             continue;
@@ -208,6 +219,12 @@ void gameLoop()
                 case 0xAB:
                     z_ret();
                     break;
+                case 0xB2:
+                    z_printf();
+                    break;
+                case 0xBB:
+                    z_new_line();
+                    break;
 				default: 
 					printf("unimplemented opcode C: %d\n", opcode);
                     exit(1);
@@ -232,13 +249,20 @@ void gameLoop()
             case 0x04:
                 z_dec_chk();
                 break;
+            case 0x10:
+                z_loadb();
+                break;
             case 0x0D:
             case 0x2D:
                 z_store();
                 break;
+            case 0x49:
+                z_and();
+                break;
             case 0x4A:
                 z_test_attr();
                 break;
+            case 0x0F:
             case 0x4F:
                 z_loadw();
                 break;
@@ -717,12 +741,6 @@ void z_storew(void)
     zorkData[(array + 2 * wordIndex) + 1] = (value & 0x0F); 
 }
 
-void z_new_line(void)
-{
-    // FIX factor out for foenix
-    printf("\n");
-}
-
 void z_ret(void)
 {
     printf("return from: %d\n", callStack_Size());
@@ -769,6 +787,39 @@ void z_dec_chk()
     storeVariable(variableNumber, --variableValue);
     
     branchTo(variableValue < operands[1]);
+}
+
+/*
+2OP:16 10 loadb array byte-index -> (result)
+
+Stores array->byte-index (i.e., the byte at address array+byte-index, which must lie in static or dynamic memory).  
+*/
+void z_loadb(void)
+{
+    ushort array = 0;
+    short byteIndex = 0;
+    byte value = 0;
+
+    if (operandType[0] == 0x02)
+    {
+        array = loadVariable(operands[0]);
+    }
+    else
+    {
+        array = operands[0];
+    }
+    
+    if (operandType[1] == 0x02)
+    {
+        byteIndex = loadVariable(operands[1]);
+    }
+    else
+    {
+        byteIndex = operands[1];
+    }
+
+    value = zorkData[array + byteIndex];
+    storeResult(value);
 }
 
 /*
@@ -922,4 +973,76 @@ void z_insert_obj(void)
     }
 
     objecttable_insertObject(object, destination);
+}
+
+/*
+0OP:178 2 print <literal-string>
+
+Print the quoted (literal) Z-encoded string.
+*/
+void z_printf(void)
+{
+      programCounter += text_printLiteral(programCounter);
+}
+
+/*
+0OP:187 B new_line
+
+Print carriage return.
+*/
+void z_new_line(void)
+{
+    printf("\n");
+}
+
+/*
+2OP:9 9 and a b -> (result)
+
+Bitwise AND.
+*/
+void z_and(void)
+{
+    ushort a = 0;
+    ushort b = 0;
+
+    if (operandType[0] == 0x02)
+    {
+        a = loadVariable(operands[0]);
+    }
+    else
+    {
+        a = operands[0];
+    }
+    
+    if (operandType[1] == 0x02)
+    {
+        b = loadVariable(operands[1]);
+    }
+    else
+    {
+        b = operands[1];
+    }
+
+    storeResult(a & b);
+}
+
+/*
+VAR:230 6 print_num value
+
+Print (signed) number in decimal.
+*/
+void z_print_num(void)
+{
+    ushort value = 0;
+
+    if (operandType[0] == 0x02)
+    {
+        value = loadVariable(operands[0]);
+    }
+    else
+    {
+        value = operands[0];
+    }
+
+    printf("%d", value);
 }
