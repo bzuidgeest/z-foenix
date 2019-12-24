@@ -9,6 +9,8 @@
 #include "zip.h"
 #include "callStack.h"
 
+#define DEBUG
+
 //http://jiten-thakkar.com/posts/writing-generic-stack-in-c
 //https://www.techiedelight.com/introduction-linked-lists/
 //https://www.codesdope.com/blog/article/making-a-stack-using-linked-list-in-c/
@@ -103,13 +105,14 @@ int main()
 
     fclose(fp);
     
+    printf("\n\n\n");
     // initialize stuff
     //globals = &zorkData[getGlobalVariableLocation()];
 	initialize();
 
     gameLoop();
 
-    printf("Hello, World!");
+    //printf("Hello, World!");
     return 0;
 } 
 
@@ -141,10 +144,15 @@ void gameLoop()
     byte tempByte;
     do
     {
+        #ifdef DEBUG
 		printf("PC: %d,", programCounter);
+        #endif
+
         ReadInstruction();
         //currentInstruction = zorkData[programCounter++]; 
-		printf(" OPCODE: 0x%X (%d)\n", opcode, opcode);
+		
+        #ifdef DEBUG
+        printf(" OPCODE: 0x%X (%d)\n", opcode, opcode);
 
         int i = 0;
         while (operandType[i] != 3)
@@ -152,6 +160,7 @@ void gameLoop()
             printf("\tOperand %d value: %d(%d) type: %d\n", i, operands[i], (ushort)operands[i], operandType[i]);
             i++;
         }
+        #endif
 
         /* VAR instruction */
         if ((opcode & 0xC0) == 0xC0)   
@@ -169,8 +178,17 @@ void gameLoop()
                     case 0xE3:
                         z_put_prop();
                         break;
+                    case 0xE5:
+                        z_print_char();
+                        break;
                     case 0xE6:
                         z_print_num();
+                        break;
+                    case 0xE8:
+                        z_push();
+                        break;
+                    case 0xE9:
+                        z_pull();
                         break;
                     default:
 						printf("unimplemented opcode A: %X (%d)", opcode, opcode);
@@ -216,8 +234,17 @@ void gameLoop()
                 case 0xA4:
                     z_get_prop_len();
                     break;
+                case 0x8C:
+                    z_jump();
+                    break;
                 case 0xAB:
                     z_ret();
+                    break;
+                case 0xB0:
+                    z_rtrue();
+                    break;
+                case 0xB1:
+                    z_rfalse();
                     break;
                 case 0xB2:
                     z_printf();
@@ -249,7 +276,11 @@ void gameLoop()
             case 0x04:
                 z_dec_chk();
                 break;
+            case 0x05:
+                z_inc_chk();
+                break;
             case 0x10:
+            case 0x30:
                 z_loadb();
                 break;
             case 0x0D:
@@ -313,21 +344,21 @@ void ReadInstruction()
                 break;
             case 1: // smallconstant variablenumber
                 operands[0] = zorkData[programCounter++];
-                operands[1] = zorkData[programCounter++];
+                operands[1] = loadVariable(zorkData[programCounter++]);
                 operandType[0] = 0x01;
                 operandType[1] = 0x02;
                 operandType[2] = 0x03;
                 break;
             case 2: // variable small
-                operands[0] = zorkData[programCounter++];
+                operands[0] = loadVariable(zorkData[programCounter++]);
                 operands[1] = zorkData[programCounter++];
                 operandType[0] = 0x02;
                 operandType[1] = 0x01;
                 operandType[2] = 0x03;
                 break;
             case 3: // variable variable
-                operands[0] = zorkData[programCounter++];
-                operands[1] = zorkData[programCounter++];
+                operands[0] = loadVariable(zorkData[programCounter++]);
+                operands[1] = loadVariable(zorkData[programCounter++]);
                 operandType[0] = 0x02;
                 operandType[1] = 0x02;
                 operandType[2] = 0x03;
@@ -356,7 +387,7 @@ void ReadInstruction()
                 operandType[1] = 0x03;
                 break;
             case 2: // variable
-                operands[0] = zorkData[programCounter++];
+                operands[0] = loadVariable(zorkData[programCounter++]);
                 operandType[0] = 0x02;
                 operandType[1] = 0x03;
                 break;
@@ -413,7 +444,7 @@ void ReadInstruction()
                     break;
                 case 0x2:
                     // get variable number
-                    operands[i] = zorkData[programCounter++];
+                    operands[i] = loadVariable(zorkData[programCounter++]);
                     break;
             }
         }
@@ -439,8 +470,8 @@ short loadVariable(short number)
     }
     else
     {
-        // globals start after 0x0F so offset
-        return globals[number - 0x0F];
+        // globals start after 16 (stack at 0 plus 15 locals) so offset 0x10
+        return globals[number - 0x10];
     }
 }
 
@@ -451,7 +482,9 @@ void storeResult(short value)
 {
 	ushort storeLocation = zorkData[programCounter++];
 
+    #ifdef DEBUG
 	printf("Storing %d to %d\n", value, storeLocation);
+    #endif
 
     if (storeLocation == 0)
     {
@@ -463,13 +496,15 @@ void storeResult(short value)
     }
     else
     {
-        globals[storeLocation - 0x0F] = value;
+        globals[storeLocation - 0x10] = value;
     }
 }
 
 void storeVariable(short location, short value)
 {
+    #ifdef DEBUG
 	printf("Storing %d to %d\n", value, location);
+    #endif
 
     if (location == 0)
     {
@@ -481,7 +516,7 @@ void storeVariable(short location, short value)
     }
     else
     {
-        globals[location - 0x0F] = value;
+        globals[location - 0x10] = value;
     }
 }
 
@@ -527,19 +562,38 @@ void branchTo(int value)
     }
 }
 
+
+void returnfromRoutine(short returnValue)
+{
+    #ifdef DEBUG
+    printf("return from: %d\n", callStack_Size());
+    #endif
+
+    // return to previous routing by popping the current one from the stack
+    functionData returnFrom = callStack_pop();
+
+    // return program counter to previous value;
+    programCounter = returnFrom.returnAddress;
+
+    // free the locals. Is this needed?
+    free(returnFrom.locals);
+
+    // pop all unused data from current routine the stack
+    while (stack_size(stack) >  returnFrom.returnStackSize)
+    {
+        stack_pop(stack);
+    }
+
+    // return the function result.
+    storeResult(returnValue);
+}
+
+
 void z_add(void)
 {
 	ushort result = 0;
 
-	if (opcode == 0x54)
-	{
-		result = loadVariable(operands[0]) + operands[1];
-	}
-
-	if (opcode == 0x74)
-	{
-		result = loadVariable(operands[0]) + loadVariable(operands[1]);
-	}
+    result = operands[0] + operands[1];
 
 	storeResult(result);
 }
@@ -548,15 +602,7 @@ void z_sub(void)
 {
 	ushort result = 0;
 
-	if (opcode == 0x55)
-	{
-		result = loadVariable(operands[0]) - operands[1];
-	}
-
-/*	if (opcode == 0x74)
-	{
-		result = a + b;
-	}*/
+    result = operands[0] - operands[1];
 
 	storeResult(result);
 }
@@ -600,26 +646,20 @@ void z_call_vs(void)
 	// counter + number of locals * 2 + 1 for the byte with local count.
 	callStack_push(fd);
 	programCounter = (operands[0] << 1) + (x * 2) + 1; 
-    printf("Added frame: %d\n", callStack_Size());
 
+    #ifdef DEBUG
+    printf("Added frame: %d\n", callStack_Size());
+    #endif
 }
 
 void z_je(void)
 {
-	int result;
-
-	if (opcode == 0x61)
-	{
-        branchTo(loadVariable(operands[0]) == loadVariable(operands[1]));
-	}
+    branchTo(operands[0] == operands[1]);
 }
 
 void z_jz(void)
 {
-    if (opcode == 0xA0)
-    {
-        branchTo(loadVariable(operands[0]) == 0);
-    }
+    branchTo(operands[0] == 0);
 }
 
 void z_get_prop_len(void)
@@ -676,28 +716,7 @@ Set the VARiable referenced by the operand to value.
 */
 void z_store(void)
 {
-    ushort variable = 0;
-    short value = 0;
-
-    if (operandType[0] == 0x02)
-    {
-        variable = loadVariable(operands[0]);
-    }
-    else
-    {
-        variable = operands[0];
-    }
-
-    if (operandType[1] == 0x02)
-    {
-        value = loadVariable(operands[1]);
-    }
-    else
-    {
-        value = operands[1];
-    }
-
-    storeVariable(variable, value);
+    storeVariable(operands[0], operands[1]);
 }
 
 /* 
@@ -706,62 +725,15 @@ array-->word-index = value, i.e. stores the given value in the word at address a
 */
 void z_storew(void)
 {
-    ushort array = 0;
-    short wordIndex = 0;
-    short value = 0;
+    ushort array = operands[0];
+    short wordIndex = operands[1];
+    short value = operands[2];
 
-    if (operandType[0] == 0x02)
-    {
-        array = loadVariable(operands[0]);
-    }
-    else
-    {
-        array = operands[0];
-    }
-    
-    if (operandType[1] == 0x02)
-    {
-        wordIndex = loadVariable(operands[1]);
-    }
-    else
-    {
-        wordIndex = operands[1];
-    }
-
-    if (operandType[2] == 0x02)
-    {
-		value = loadVariable(operands[2]);
-    }
-    else
-    {
-        value = operands[2];
-    }
-    
     zorkData[array + 2 * wordIndex] = (value >> 8); 
     zorkData[(array + 2 * wordIndex) + 1] = (value & 0x0F); 
 }
 
-void z_ret(void)
-{
-    printf("return from: %d\n", callStack_Size());
-    // return to previous routing by popping the current one from the stack
-    functionData returnFrom = callStack_pop();
 
-    // return program counter to previous value;
-    programCounter = returnFrom.returnAddress;
-
-    // free the locals. Is this needed?
-    free(returnFrom.locals);
-
-    // pop all unused data from current routine the stack
-    while (stack_size(stack) >  returnFrom.returnStackSize)
-    {
-        stack_pop(stack);
-    }
-
-    // return the function result.
-    storeResult(operands[0]);
-}
 
 // 2OP:4 4 dec_chk (variable) value ?(label)
 // Decrement variable, and branch if it is now less than the given value.
@@ -770,23 +742,34 @@ void z_dec_chk()
     short variableValue = 0;
     short variableNumber = 0;
 
-    if (operandType[0] == 0x02)
-    {
-        // variable contains number of variable to load
-        variableNumber = loadVariable(operands[0]);
-        variableValue = loadVariable(variableNumber);
-    }
-    else
-    {
-        // constant gives variable to load
-        variableNumber = operands[0];
-        variableValue = loadVariable(variableNumber);
-    }
+    // constant gives variable to load
+    variableNumber = operands[0];
+    variableValue = loadVariable(variableNumber);
 
     // decrement value and store back;
     storeVariable(variableNumber, --variableValue);
     
     branchTo(variableValue < operands[1]);
+}
+
+/*
+2OP:5 5 inc_chk (variable) value ?(label)
+
+Increment variable, and branch if now greater than value.
+*/
+void z_inc_chk()
+{
+    short variableValue = 0;
+    short variableNumber = 0;
+
+    // constant gives variable to load
+    variableNumber = operands[0];
+    variableValue = loadVariable(variableNumber);
+
+    // increment value and store back;
+    storeVariable(variableNumber, ++variableValue);
+    
+    branchTo(variableValue > operands[1]);
 }
 
 /*
@@ -800,23 +783,8 @@ void z_loadb(void)
     short byteIndex = 0;
     byte value = 0;
 
-    if (operandType[0] == 0x02)
-    {
-        array = loadVariable(operands[0]);
-    }
-    else
-    {
-        array = operands[0];
-    }
-    
-    if (operandType[1] == 0x02)
-    {
-        byteIndex = loadVariable(operands[1]);
-    }
-    else
-    {
-        byteIndex = operands[1];
-    }
+    array = operands[0];
+    byteIndex = operands[1];
 
     value = zorkData[array + byteIndex];
     storeResult(value);
@@ -833,23 +801,8 @@ void z_loadw(void)
     short wordIndex = 0;
     short value = 0;
 
-    if (operandType[0] == 0x02)
-    {
-        array = loadVariable(operands[0]);
-    }
-    else
-    {
-        array = operands[0];
-    }
-    
-    if (operandType[1] == 0x02)
-    {
-        wordIndex = loadVariable(operands[1]);
-    }
-    else
-    {
-        wordIndex = operands[1];
-    }
+    array = operands[0];
+    wordIndex = operands[1];
 
     value = (zorkData[array + 2 * wordIndex] << 8) + zorkData[(array + 2 * wordIndex) + 1];    
     storeResult(value);
@@ -921,23 +874,8 @@ void z_test_attr(void)
     ushort object = 0;
     byte attribute = 0;
 
-    if (operandType[0] == 0x02)
-    {
-        object = loadVariable(operands[0]);
-    }
-    else
-    {
-        object = operands[0];
-    }
-    
-    if (operandType[1] == 0x02)
-    {
-        attribute = loadVariable(operands[1]);
-    }
-    else
-    {
-        attribute = operands[1];
-    }
+    object = operands[0];
+    attribute = operands[1];
 
     branchTo(objecttable_getObjectAttribute(object, attribute));
 }
@@ -954,23 +892,8 @@ void z_insert_obj(void)
     ushort object = 0;
     byte destination = 0;
 
-    if (operandType[0] == 0x02)
-    {
-        object = loadVariable(operands[0]);
-    }
-    else
-    {
-        object = operands[0];
-    }
-    
-    if (operandType[1] == 0x02)
-    {
-        destination = loadVariable(operands[1]);
-    }
-    else
-    {
-        destination = operands[1];
-    }
+    object = operands[0];
+    destination = operands[1];
 
     objecttable_insertObject(object, destination);
 }
@@ -982,7 +905,7 @@ Print the quoted (literal) Z-encoded string.
 */
 void z_printf(void)
 {
-      programCounter += text_printLiteral(programCounter);
+    programCounter += text_printLiteral(programCounter);
 }
 
 /*
@@ -1005,23 +928,8 @@ void z_and(void)
     ushort a = 0;
     ushort b = 0;
 
-    if (operandType[0] == 0x02)
-    {
-        a = loadVariable(operands[0]);
-    }
-    else
-    {
-        a = operands[0];
-    }
-    
-    if (operandType[1] == 0x02)
-    {
-        b = loadVariable(operands[1]);
-    }
-    else
-    {
-        b = operands[1];
-    }
+    a = operands[0];
+    b = operands[1];
 
     storeResult(a & b);
 }
@@ -1033,16 +941,134 @@ Print (signed) number in decimal.
 */
 void z_print_num(void)
 {
-    ushort value = 0;
+    printf("%d", operands[0]);
+}
 
-    if (operandType[0] == 0x02)
+/*
+1OP:140 C jump ?(label)
+
+Jump (unconditionally) to the given label. (This is not a branch instruction and the operand is a 2-byte signed offset to apply to the program counter.) 
+It is legal for this to jump into a different routine (which should not change the routine call state), although it is considered bad practice to do 
+so and the Txd disassembler is confused by it.
+
+The destination of the jump opcode is:
+Address after instruction + Offset - 2
+This is analogous to the calculation for branch offsets.
+*/
+void z_jump(void)
+{
+    programCounter = programCounter + operands[0] - 2;
+}
+
+/*
+VAR:229 5 print_char output-character-code
+
+Print a ZSCII character. The operand must be a character code defined in ZSCII for output (see S 3). In particular, it must certainly not be negative or 
+larger than 1023. 
+*/
+void z_print_char(void)
+{
+    if (operands[0] < 0 && operands[0] > 1023)
     {
-        value = loadVariable(operands[0]);
+        printf("Illegal ZSCII character: %d", operands[0]);
+        exit(1);
+    }
+
+    if (operands[0] >= 32 && operands[0] <=126)
+    {
+        printf("%c", operands[0]);
     }
     else
     {
-        value = operands[0];
+        if (operands[0] > 155 && operands[1] < 255)
+        {
+            printf("extended char, not implemented yet.");
+        }
+        else if (operands[0] == 13)
+        {
+            printf("\n");
+        }
+        else
+        {
+            printf("unimplemented character: %d", operands[0]);
+        }
+        
+    }
+}
+
+void z_ret(void)
+{
+    /*
+    printf("return from: %d\n", callStack_Size());
+    // return to previous routing by popping the current one from the stack
+    functionData returnFrom = callStack_pop();
+
+    // return program counter to previous value;
+    programCounter = returnFrom.returnAddress;
+
+    // free the locals. Is this needed?
+    free(returnFrom.locals);
+
+    // pop all unused data from current routine the stack
+    while (stack_size(stack) >  returnFrom.returnStackSize)
+    {
+        stack_pop(stack);
     }
 
-    printf("%d", value);
+    // return the function result.
+    storeResult(operands[0]);*/
+
+    returnfromRoutine(operands[0]);
+}
+
+/*
+0OP:176 0 rtrue
+
+Return true (i.e., 1) from the current routine.
+*/
+void z_rtrue(void)
+{
+    returnfromRoutine(1);
+} 
+
+/*
+0OP:177 1 rfalse
+
+Return false (i.e., 0) from the current routine.
+*/
+void z_rfalse(void)
+{
+    returnfromRoutine(0);
+}
+
+/*
+VAR:232 8 push value
+
+Pushes value onto the game stack.
+*/
+void z_push(void)
+{
+    stack_push(stack, operands[0]);
+}
+
+/*
+VAR:233 9 1 pull (variable)
+
+6 pull stack -> (result)
+
+Pulls value off a stack. (If the stack underflows, the interpreter should halt with a suitable error message.) 
+In Version 6, the stack in question may be specified as a user one: otherwise it is the game stack. 
+*/
+void z_pull()
+{
+    if (zorkHeader->version < 6)
+    {
+        storeVariable(operands[0], stack_pop(stack));
+    }
+    else
+    {
+        printf("user stack unimplemented.");
+        exit(1);
+    }
+    
 }
