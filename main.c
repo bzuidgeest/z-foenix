@@ -1133,5 +1133,5 @@ Get parent object (note that this has no "branch if exists" clause).
 */
 void z_get_parent(void)
 {
-    storeResult(objecttable_getObjectParent());
+    storeResult(objecttable_getObjectParent(operands[0]));
 }
