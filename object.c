@@ -104,8 +104,11 @@ ushort objecttable_getObjectAddress(ushort number)
     }
 }
 
-ushort objecttable_getObjectParent(ushort objectAddress)
+ushort objecttable_getObjectParent(ushort objectNumber)
 {
+    // get object address from object index
+    ushort objectAddress = objecttable_getObjectAddress(objectNumber);
+
     if(objecttableVersion < 4)
     {
         return zorkData[objectAddress + 4];
@@ -120,12 +123,12 @@ ushort objecttable_setObjectParent(ushort objectAddress, ushort value)
 {
     if(objecttableVersion < 4)
     {
-        zorkData[objectAddress + 4] = value & 0x0F;
+        zorkData[objectAddress + 4] = value & 0xFF;
     }
     else
     {
-        zorkData[objectAddress + 6] = (value >> 8) & 0x0F;
-        zorkData[objectAddress + 7] = (value) & 0x0F;
+        zorkData[objectAddress + 6] = (value >> 8) & 0xFF;
+        zorkData[objectAddress + 7] = (value) & 0xFF;
     }
 }
 
@@ -146,12 +149,12 @@ void objecttable_setObjectChild(ushort objectAddress, ushort value)
 {
     if(objecttableVersion < 4)
     {
-        zorkData[objectAddress + 6] = value & 0x0F;
+        zorkData[objectAddress + 6] = value & 0xFF;
     }
     else
     {
-        zorkData[objectAddress + 10] = (value >> 8) & 0x0F;
-        zorkData[objectAddress + 11] = (value) & 0x0F;
+        zorkData[objectAddress + 10] = (value >> 8) & 0xFF;
+        zorkData[objectAddress + 11] = (value) & 0xFF;
     }
 }
 
@@ -171,17 +174,20 @@ void objecttable_setObjectSibbling(ushort objectAddress, ushort value)
 {
      if(objecttableVersion < 4)
     {
-        zorkData[objectAddress + 5] = value & 0x0F;
+        zorkData[objectAddress + 5] = value & 0xFF;
     }
     else
     {
-        zorkData[objectAddress + 8] = (value >> 8) & 0x0F;
-        zorkData[objectAddress + 9] = (value) & 0x0F;
+        zorkData[objectAddress + 8] = (value >> 8) & 0xFF;
+        zorkData[objectAddress + 9] = (value) & 0xFF;
     }
 }
 
-ushort objecttable_getObjectPropertyTableAddress(ushort objectAddress)
+ushort objecttable_getObjectPropertyTableAddress(ushort objectNumber)
 {
+    // get object address from object index
+    ushort objectAddress = objecttable_getObjectAddress(objectNumber);
+
     if(objecttableVersion < 4)
     {
         return (zorkData[objectAddress + 7] << 8) + (zorkData[objectAddress + 8]);
@@ -211,6 +217,26 @@ byte objecttable_getObjectAttribute(ushort objectNumber, ushort attributeNumber)
     }
 }
 
+void objecttable_setObjectAttribute(ushort objectNumber, ushort attributeNumber)
+{
+    // get object address from object index
+    ushort objectAddres = objecttable_getObjectAddress(objectNumber);
+
+    if ((objecttableVersion < 4 && attributeNumber < 32) || (objecttableVersion >= 4 && attributeNumber < 48))
+    {
+        // for every 8 bit get the next byte using division
+        // then shift the byte modules 8 to the left to get the interesting bit at the attribute position in the current byte
+        // then use "or" 1 to set that bit for the object.
+        zorkData[objectAddres + (attributeNumber / 8)] | (0x01 << (7 - (attributeNumber % 8))); 
+    }
+    else
+    {
+        printf("Invalid attribute set: %d for version %d", attributeNumber, objecttableVersion);
+        exit(1);
+    }
+}
+
+
 /*
 12.4
 Each object has its own property table. Each of these can be anywhere in dynamic memory (indeed, a game can legally change an object's properties 
@@ -223,11 +249,17 @@ where the text-length is the number of 2-byte words making up the text, which is
 name is limited to 765 Z-characters.) After the header, the properties are listed in descending numerical order. (This order is essential and is not a 
 matter of convention.)
 */
-char * objecttable_getObjectName(ushort propertyTableAddress)
+char * objecttable_getObjectName(ushort objectNumber)
 {
+    ushort propertyTableAddress = objecttable_getObjectPropertyTableAddress(objectNumber);
     byte length = zorkData[propertyTableAddress];
-    char *name = readText(propertyTableAddress, length);
+    char *name = readText(propertyTableAddress + 1, length);
     return *name;
+}
+
+ushort objecttable_getObjectNameAddress(ushort objectNumber)
+{
+    return objecttable_getObjectPropertyTableAddress(objectNumber) + 1;
 }
 
 /*
@@ -263,7 +295,7 @@ bit 6 is either clear to indicate a property data length of 1, or set to indicat
 */
 ushort objecttable_getFirstPropertyAddress(ushort objectNumber)
 {
-    ushort propertytableAddress = objecttable_getObjectPropertyTableAddress(objecttable_getObjectAddress(objectNumber));
+    ushort propertytableAddress = objecttable_getObjectPropertyTableAddress(objectNumber);
     // First property of an object should be start of property table + the lenght byte of the object name + object name bytes.
     return propertytableAddress + zorkData[propertytableAddress] * 2 + 1;
 }
@@ -305,7 +337,7 @@ void objecttable_insertObject(ushort sourceObjectNumber, ushort destinationObjec
 
 
     // remove object from its current location in the tree and stitch tree back together
-    ushort sourceObjectParent = objecttable_getObjectParent(sourceObjectAddress);
+    ushort sourceObjectParent = objecttable_getObjectParent(sourceObjectNumber);
     if (sourceObjectParent != 0)
     {
         printf("need to write tree patching code");

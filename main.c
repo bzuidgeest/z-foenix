@@ -32,6 +32,7 @@ short operands[8];
 short operandType[8];
 short storeLocation;
 
+int instructionCount = -1;
 
 //u_int8_t *zorkData;
 extern struct header *zorkHeader;
@@ -133,6 +134,7 @@ void initialize(void)
 void gameLoop()
 {
     programCounter = getInitialProgramCounter();
+   
 
     printf("\n");
     //u_int16_t operands[8];
@@ -147,6 +149,8 @@ void gameLoop()
         #ifdef DEBUG
 		printf("PC: %d,", programCounter);
         #endif
+
+        instructionCount++;
 
         ReadInstruction();
         //currentInstruction = zorkData[programCounter++]; 
@@ -202,7 +206,7 @@ void gameLoop()
                 switch(opcode)
                 {
                     case 0xC9:
-                        z_add();
+                        z_and();
                         break;
                     default:
 				        printf("unimplemented opcode B: %d", opcode);
@@ -211,7 +215,8 @@ void gameLoop()
                 }
             }
              
-            continue;
+            //continue;
+            goto endloop;
         }
 
         /* SHORT instruction */
@@ -237,6 +242,12 @@ void gameLoop()
                 case 0x8C:
                     z_jump();
                     break;
+                case 0xA3:
+                    z_get_parent();
+                    break;
+                case 0xAA:
+                    z_print_obj();
+                    break;
                 case 0xAB:
                     z_ret();
                     break;
@@ -257,7 +268,8 @@ void gameLoop()
                     exit(1);
 					break;
             }
-            continue;
+            //continue;
+            goto endloop;
         }
 
         /* Extended instructions for level 5 and above */
@@ -267,7 +279,8 @@ void gameLoop()
             exit(1);
 			break;
 
-            continue;
+            //continue;
+            goto endloop;
         }
 
         /* LONG instruction */
@@ -287,11 +300,17 @@ void gameLoop()
             case 0x2D:
                 z_store();
                 break;
+            case 0x46:
+                z_jin();
+                break;
             case 0x49:
                 z_and();
                 break;
             case 0x4A:
                 z_test_attr();
+                break;
+            case 0x4B:
+                z_set_attr();
                 break;
             case 0x0F:
             case 0x4F:
@@ -316,7 +335,11 @@ void gameLoop()
 				break;
         }
 
-    } while (1);
+        endloop:
+        //dummy printf to attach breakpoint
+        printf("");
+    } 
+    while (1);
     
 
 
@@ -456,17 +479,16 @@ void ReadInstruction()
 short loadVariable(short number)
 {
     // change variable number to variable value for processing
-    if(number <= 0x0F)
+    
+    
+    if (number == 0)
     {
-        if (number == 0)
-        {
-            return stack_pop(stack);
-        }
-        else
-        {
-            // 0 is stack so 1 is first local giving an array offset of 1
-            return callStack_top().locals[number - 1];
-        }
+        return stack_pop(stack);
+    }
+    else if(number <= 0x0F)
+    {
+        // 0 is stack so 1 is first local giving an array offset of 1
+        return callStack_top().locals[number - 1];
     }
     else
     {
@@ -482,40 +504,56 @@ void storeResult(short value)
 {
 	ushort storeLocation = zorkData[programCounter++];
 
-    #ifdef DEBUG
-	printf("Storing %d to %d\n", value, storeLocation);
-    #endif
-
     if (storeLocation == 0)
     {
+        #ifdef DEBUG
+        printf("Storing %d (%d) to stack\n", value, (ushort)value, storeLocation);
+        #endif
+
         stack_push(stack, value);
     }
     else if (storeLocation <= 15)
     {
+        #ifdef DEBUG
+        printf("Storing local %d (%d)  to %d\n", value, (ushort)value, storeLocation);
+        #endif
+
         callStack_top().locals[storeLocation - 1] = value;
     }
     else
     {
+        #ifdef DEBUG
+        printf("Storing global %d (%d) to %d\n", value, (ushort)value, storeLocation - 0x10);
+        #endif
+
         globals[storeLocation - 0x10] = value;
     }
 }
 
 void storeVariable(short location, short value)
 {
-    #ifdef DEBUG
-	printf("Storing %d to %d\n", value, location);
-    #endif
-
     if (location == 0)
     {
+        #ifdef DEBUG
+        printf("Storing %d (%d) to stack\n", value, (ushort)value, location);
+        #endif
+
         stack_push(stack, value);
     }
     else if (location <= 15)
     {
+        #ifdef DEBUG
+        printf("Storing local %d (%d) to %d\n", value, (ushort)value, location);
+        #endif
+
         callStack_top().locals[location - 1] = value;
     }
     else
     {
+        #ifdef DEBUG
+        printf("Storing global %d (%d) to %d\n", value, (ushort)value, location - 0x10);
+        #endif
+
         globals[location - 0x10] = value;
     }
 }
@@ -626,26 +664,19 @@ void z_call_vs(void)
 	// fix packed addressess implement 1.2.3 here 
 	u_int16_t x = zorkData[operands[0] << 1]; // (left shift 1 gives *2)
 	fd.locals = malloc(x * 2); // times two as short is two bytes per item
-	// Clear locals
+	
+    // Clear and load locals
 	memset(fd.locals, 0, x * 2);
-	for (int i = 0; i < x; i++)
+	for (int i = 0; (i / 2) < x; i += 2)
 	{
-		if(operandType[i + 1] != 0x03)
-		{
-			fd.locals[i] = operands[i + 1]; 
-		}
-		else
-		{
-			//fd.locals[i] = 0;
-			// Done copying the operands over. break loop.
-			break;
-		}
+        fd.locals[i] = (zorkData[(operands[0] << 1) + 1 + i] << 8) + zorkData[(operands[0] << 1) + 2 + i];
 	}
 
 	// call routine
 	// counter + number of locals * 2 + 1 for the byte with local count.
 	callStack_push(fd);
 	programCounter = (operands[0] << 1) + (x * 2) + 1; 
+
 
     #ifdef DEBUG
     printf("Added frame: %d\n", callStack_Size());
@@ -694,20 +725,11 @@ void z_get_prop_len(void)
 
         //}
 
-        if (store == 0)
-        {
-            stack_push(stack, value);
-        }
-        else if (store <= 15)
-        {
-            callStack_top().locals[store - 1] = value;
-        }
-        else
-        {
-            globals[store - 0x0F] = value;
-        }
+        
         
     }
+    
+    storeResult(value);
 }
 
 /* 
@@ -730,7 +752,7 @@ void z_storew(void)
     short value = operands[2];
 
     zorkData[array + 2 * wordIndex] = (value >> 8); 
-    zorkData[(array + 2 * wordIndex) + 1] = (value & 0x0F); 
+    zorkData[(array + 2 * wordIndex) + 1] = (value & 0xFF); 
 }
 
 
@@ -1071,4 +1093,45 @@ void z_pull()
         exit(1);
     }
     
+}
+
+/*
+2OP:11 B set_attr object attribute
+
+Make object have the attribute numbered attribute.
+*/
+void z_set_attr()
+{
+    objecttable_setObjectAttribute(operands[0], operands[1]);
+}
+
+/*
+2OP:6 6 jin obj1 obj2 ?(label)
+
+Jump if object a is a direct child of b, i.e., if parent of a is b. 
+*/
+void z_jin()
+{
+    branchTo(objecttable_getObjectParent(operands[0]) == operands[1]);
+}
+
+/*
+1OP:138 A print_obj object
+
+Print short name of object (the Z-encoded string in the object header, 
+not a property). If the object number is invalid, the interpreter should halt with a suitable error message. 
+*/
+void z_print_obj(void)
+{
+    text_printLiteral(objecttable_getObjectNameAddress(operands[0]));
+}
+
+/*
+1OP:131 3 get_parent object -> (result)
+
+Get parent object (note that this has no "branch if exists" clause). 
+*/
+void z_get_parent(void)
+{
+    storeResult(objecttable_getObjectParent());
 }
