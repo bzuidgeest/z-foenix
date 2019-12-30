@@ -19,7 +19,7 @@ typedef u_int16_t ushort;
 
 void initialize(void);
 void gameLoop(void);
-void ReadInstruction();
+void ReadInstruction(void);
 short loadVariable(short number);
 void storeVariable(short location, short value);
 void StoreResult(short value);
@@ -156,7 +156,7 @@ void gameLoop()
         //currentInstruction = zorkData[programCounter++]; 
 		
         #ifdef DEBUG
-        printf(" OPCODE: 0x%X (%d)\n", opcode, opcode);
+        printf(" OPCODE: 0x%X (%d) instruction: %d\n", opcode, opcode, instructionCount);
 
         int i = 0;
         while (operandType[i] != 3)
@@ -165,7 +165,7 @@ void gameLoop()
             i++;
         }
         #endif
-
+//printf("%d", instructionCount);
         /* VAR instruction */
         if ((opcode & 0xC0) == 0xC0)   
         {
@@ -205,6 +205,9 @@ void gameLoop()
             {
                 switch(opcode)
                 {
+                    case 0xC1:
+                        z_je();
+                        break;
                     case 0xC9:
                         z_and();
                         break;
@@ -241,6 +244,15 @@ void gameLoop()
                     break;
                 case 0x8C:
                     z_jump();
+                    break;
+                case 0x95:
+                    z_inc();
+                    break;
+                case 0xA1:
+                    z_get_sibling();
+                    break;
+                case 0xA2:
+                    z_get_child();
                     break;
                 case 0xA3:
                     z_get_parent();
@@ -286,6 +298,13 @@ void gameLoop()
         /* LONG instruction */
         switch(opcode)
         {
+            case 0x41:
+            case 0x61:
+				z_je();
+                break;
+            case 0x42:
+                z_jl();
+                break;
             case 0x04:
                 z_dec_chk();
                 break;
@@ -320,12 +339,13 @@ void gameLoop()
 			case 0x74:
 				z_add();
                 break;
+            case 0x51:
+                z_get_prop();
+                break;
             case 0x55:
                 z_sub();
                 break;
-			case 0x61:
-				z_je();
-                break;
+			
             case 0x6E:
 				z_insert_obj();
                 break;
@@ -443,7 +463,9 @@ void ReadInstruction()
             operandType[i] = tempByte & 0x03;
             tempByte = tempByte >> 2;
         }
-        if (operandType[3] != 0x03 && operandType[2] != 0x03 && operandType[1] != 0x03 && operandType[0] != 0x03)
+        // 4.5.1 Note that only call_vs2 and call_vn2 can have more than 4 operands, and no instruction can have more than 8. 
+        //if (operandType[3] != 0x03 && operandType[2] != 0x03 && operandType[1] != 0x03 && operandType[0] != 0x03 && opcode != 0xE0)
+        if (opcode == 0xEC || opcode == 0xFA)
         {
             // Load second operand byte
             tempByte = zorkData[programCounter++];
@@ -453,8 +475,15 @@ void ReadInstruction()
                 tempByte = tempByte >> 2;
             }
         }
+        else
+        {
+            // signal "end of operands" in case of 4 operand calls. Does nothing when less than 4 operands are used.
+            operandType[4] = 0x03;
+        }
+        
 
         // Read operands
+        //for(int i = 0; operandType[i] != 0x3 && i < 8; i++)
         for(int i = 0; operandType[i] != 0x3 && i < 8; i++)
         {
             switch(operandType[i])
@@ -590,13 +619,14 @@ void branchTo(int value)
     
     if ((branchByte1 >> 7 && value == 1) || ((branchByte1 >> 7) == 0 && value == 0))
     {
-        programCounter = programCounter + branchOffset - 2;
-    }
-
-    if (branchOffset == 0)
-    {
-        printf("Implement return true or false from function\n");
-        exit(1);
+        if (branchOffset == 0 || branchOffset == 1)
+        {
+            returnfromRoutine(branchOffset);
+        }
+        else
+        {
+            programCounter = programCounter + branchOffset - 2;
+        }
     }
 }
 
@@ -645,8 +675,20 @@ void z_sub(void)
 	storeResult(result);
 }
 
+/*
+VAR:224 0 1 call routine ...up to 3 args... -> (result)
+
+The only call instruction in Version 3, Inform reads this as call_vs in higher versions: it calls the routine with 0, 1, 2 or 3 arguments 
+as supplied and stores the resulting return value. (When the address 0 is called as a routine, nothing happens and the return value is false.) 
+*/
 void z_call_vs(void)
 {
+    if(operands[0] == 0)
+    {
+        storeResult(0);
+        return;
+    }
+
 	// New functiondata object to push on the callstack
 	functionData fd;
 
@@ -665,11 +707,18 @@ void z_call_vs(void)
 	u_int16_t x = zorkData[operands[0] << 1]; // (left shift 1 gives *2)
 	fd.locals = malloc(x * 2); // times two as short is two bytes per item
 	
-    // Clear and load locals
+    // Clear and load locals from routine header
 	memset(fd.locals, 0, x * 2);
 	for (int i = 0; (i / 2) < x; i += 2)
 	{
         fd.locals[i] = (zorkData[(operands[0] << 1) + 1 + i] << 8) + zorkData[(operands[0] << 1) + 2 + i];
+	}
+
+    // set locals from function operands
+    // first operand is routine address so skip that.
+    for (int i = 1; operandType[i] != 0x03; i++)
+	{
+        fd.locals[i - 1] = operands[i];
 	}
 
 	// call routine
@@ -685,7 +734,22 @@ void z_call_vs(void)
 
 void z_je(void)
 {
-    branchTo(operands[0] == operands[1]);
+
+    if (opcode != 0xC1)
+    {
+        branchTo(operands[0] == operands[1]);
+    }
+    else
+    {
+        ushort result = 0;
+        for (int i = 1; operandType[i] != 3; i++)
+        {
+            if (operands[0] == operands[i])
+                result = 1;
+        }
+        branchTo(result);
+    }
+    
 }
 
 void z_jz(void)
@@ -759,7 +823,7 @@ void z_storew(void)
 
 // 2OP:4 4 dec_chk (variable) value ?(label)
 // Decrement variable, and branch if it is now less than the given value.
-void z_dec_chk()
+void z_dec_chk(void)
 {
     short variableValue = 0;
     short variableNumber = 0;
@@ -779,7 +843,7 @@ void z_dec_chk()
 
 Increment variable, and branch if now greater than value.
 */
-void z_inc_chk()
+void z_inc_chk(void)
 {
     short variableValue = 0;
     short variableNumber = 0;
@@ -1081,7 +1145,7 @@ VAR:233 9 1 pull (variable)
 Pulls value off a stack. (If the stack underflows, the interpreter should halt with a suitable error message.) 
 In Version 6, the stack in question may be specified as a user one: otherwise it is the game stack. 
 */
-void z_pull()
+void z_pull(void)
 {
     if (zorkHeader->version < 6)
     {
@@ -1100,7 +1164,7 @@ void z_pull()
 
 Make object have the attribute numbered attribute.
 */
-void z_set_attr()
+void z_set_attr(void)
 {
     objecttable_setObjectAttribute(operands[0], operands[1]);
 }
@@ -1110,7 +1174,7 @@ void z_set_attr()
 
 Jump if object a is a direct child of b, i.e., if parent of a is b. 
 */
-void z_jin()
+void z_jin(void)
 {
     branchTo(objecttable_getObjectParent(operands[0]) == operands[1]);
 }
@@ -1134,4 +1198,68 @@ Get parent object (note that this has no "branch if exists" clause).
 void z_get_parent(void)
 {
     storeResult(objecttable_getObjectParent(operands[0]));
+}
+
+/*
+2OP:17 11 get_prop object property -> (result)
+
+Read property from object (resulting in the default value if it had no such declared property). If the property has length 1, the value 
+is only that byte. If it has length 2, the first two bytes of the property are taken as a word value. It is illegal for the opcode to be used if 
+the property has length greater than 2, and the result is unspecified. 
+*/
+void z_get_prop(void)
+{
+    storeResult(objecttable_getPropertyShort(operands[0], operands[1]));
+}
+
+/*
+1OP:130 2 get_child object -> (result) ?(label)
+
+Get first object contained in given object, branching if this exists, i.e. is not nothing (i.e., is not 0). 
+*/
+void z_get_child(void)
+{
+    ushort child = objecttable_getObjectChild(operands[0]);
+    storeResult(child);
+    branchTo(child != 0);
+}
+
+/*
+1OP:129 1 get_sibling object -> (result) ?(label)
+
+Get next object in tree, branching if this exists, i.e. is not 0. 
+*/
+void z_get_sibling(void)
+{
+    ushort sibling = objecttable_getObjectSibling(operands[0]);
+    storeResult(sibling);
+    branchTo(sibling != 0);
+}
+
+/*
+1OP:133 5 inc (variable)
+
+Increment variable by 1. (This is signed, so -1 increments to 0.) 
+*/
+void z_inc(void)
+{
+    short variableValue = 0;
+    short variableNumber = 0;
+
+    // constant gives variable to load
+    variableNumber = operands[0];
+    variableValue = loadVariable(variableNumber);
+
+    // increment value and store back;
+    storeVariable(variableNumber, ++variableValue);
+}
+
+/*
+2OP:2 2 jl a b ?(label)
+
+Jump if a < b (using a signed 16-bit comparison)
+*/
+void z_jl(void)
+{
+    branchTo(operands[0] < operands[1]);
 }
