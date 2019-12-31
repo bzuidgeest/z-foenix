@@ -9,7 +9,7 @@
 
 struct functionData
 {
-    short *locals;
+    short locals[16];
     u_int16_t returnAddress;
     u_int16_t returnValueStorage;
     u_int16_t returnStackSize;
@@ -28,9 +28,9 @@ typedef struct node node;
 node *top;
 
 void callStack_initialize();
-void callStack_push(functionData value);
+void callStack_push();
 functionData callStack_pop();
-functionData callStack_top();
+functionData* callStack_top();
 int callStack_isEmpty();
 
 short callStack_Size(void);

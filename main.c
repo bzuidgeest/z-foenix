@@ -9,7 +9,7 @@
 #include "zip.h"
 #include "callStack.h"
 
-#define DEBUG
+#define DEBUGx
 
 //http://jiten-thakkar.com/posts/writing-generic-stack-in-c
 //https://www.techiedelight.com/introduction-linked-lists/
@@ -182,6 +182,9 @@ void gameLoop()
                     case 0xE3:
                         z_put_prop();
                         break;
+                    case 0xE4:
+                        z_read();
+                        break;
                     case 0xE5:
                         z_print_char();
                         break;
@@ -271,6 +274,9 @@ void gameLoop()
                     break;
                 case 0xB2:
                     z_printf();
+                    break;
+                case 0xB8:
+                    z_ret_popped();
                     break;
                 case 0xBB:
                     z_new_line();
@@ -508,8 +514,7 @@ void ReadInstruction()
 short loadVariable(short number)
 {
     // change variable number to variable value for processing
-    
-    
+
     if (number == 0)
     {
         return stack_pop(stack);
@@ -517,7 +522,7 @@ short loadVariable(short number)
     else if(number <= 0x0F)
     {
         // 0 is stack so 1 is first local giving an array offset of 1
-        return callStack_top().locals[number - 1];
+        return callStack_top()->locals[number - 1];
     }
     else
     {
@@ -547,7 +552,7 @@ void storeResult(short value)
         printf("Storing local %d (%d)  to %d\n", value, (ushort)value, storeLocation);
         #endif
 
-        callStack_top().locals[storeLocation - 1] = value;
+        callStack_top()->locals[storeLocation - 1] = value;
     }
     else
     {
@@ -575,7 +580,7 @@ void storeVariable(short location, short value)
         printf("Storing local %d (%d) to %d\n", value, (ushort)value, location);
         #endif
 
-        callStack_top().locals[location - 1] = value;
+        callStack_top()->locals[location - 1] = value;
     }
     else
     {
@@ -644,7 +649,7 @@ void returnfromRoutine(short returnValue)
     programCounter = returnFrom.returnAddress;
 
     // free the locals. Is this needed?
-    free(returnFrom.locals);
+    //free(returnFrom.locals);
 
     // pop all unused data from current routine the stack
     while (stack_size(stack) >  returnFrom.returnStackSize)
@@ -690,45 +695,47 @@ void z_call_vs(void)
     }
 
 	// New functiondata object to push on the callstack
-	functionData fd;
+    callStack_push();
+	//callStack_top()->locals = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	// Read storage location and push on stack;
 	// do not read here, read after return
 	//fd.returnValueStorage = storeLocation; //zorkData[programCounter++];
-
+    
 	// Push return program counter to stack
-	fd.returnAddress = programCounter;
+	callStack_top()->returnAddress = programCounter;
 
 	// Push current stackDepth to stack and set to zero
-	fd.returnStackSize = stack_size(stack);
+	callStack_top()->returnStackSize = stack_size(stack);
 	
 	// read number of locals in routine
 	// fix packed addressess implement 1.2.3 here 
 	u_int16_t x = zorkData[operands[0] << 1]; // (left shift 1 gives *2)
-	fd.locals = malloc(x * 2); // times two as short is two bytes per item
+	//fd.locals = malloc(x * 2); // times two as short is two bytes per item
 	
     // Clear and load locals from routine header
-	memset(fd.locals, 0, x * 2);
+	//memset(fd.locals, 0, x * 2);
+    memset(callStack_top()->locals, 0, 15 * 2);
 	for (int i = 0; (i / 2) < x; i += 2)
 	{
-        fd.locals[i] = (zorkData[(operands[0] << 1) + 1 + i] << 8) + zorkData[(operands[0] << 1) + 2 + i];
+        callStack_top()->locals[i / 2] = (zorkData[(operands[0] << 1) + 1 + i] << 8) + zorkData[(operands[0] << 1) + 2 + i];
 	}
 
     // set locals from function operands
     // first operand is routine address so skip that.
     for (int i = 1; operandType[i] != 0x03; i++)
 	{
-        fd.locals[i - 1] = operands[i];
+        callStack_top()->locals[i - 1] = operands[i];
 	}
 
 	// call routine
 	// counter + number of locals * 2 + 1 for the byte with local count.
-	callStack_push(fd);
+	//callStack_push(fd);
 	programCounter = (operands[0] << 1) + (x * 2) + 1; 
 
 
     #ifdef DEBUG
-    printf("Added frame: %d\n", callStack_Size());
+    printf("Added frame: %d returnAddress: %d \n", callStack_Size(), top->data.returnAddress);
     #endif
 }
 
@@ -1084,26 +1091,6 @@ void z_print_char(void)
 
 void z_ret(void)
 {
-    /*
-    printf("return from: %d\n", callStack_Size());
-    // return to previous routing by popping the current one from the stack
-    functionData returnFrom = callStack_pop();
-
-    // return program counter to previous value;
-    programCounter = returnFrom.returnAddress;
-
-    // free the locals. Is this needed?
-    free(returnFrom.locals);
-
-    // pop all unused data from current routine the stack
-    while (stack_size(stack) >  returnFrom.returnStackSize)
-    {
-        stack_pop(stack);
-    }
-
-    // return the function result.
-    storeResult(operands[0]);*/
-
     returnfromRoutine(operands[0]);
 }
 
@@ -1262,4 +1249,26 @@ Jump if a < b (using a signed 16-bit comparison)
 void z_jl(void)
 {
     branchTo(operands[0] < operands[1]);
+}
+
+/*
+0OP:184 8 ret_popped
+
+Pops top of stack and returns that. (This is equivalent to ret sp, but is one byte cheaper.) 
+*/
+void z_ret_popped(void)
+{
+    returnfromRoutine(loadVariable(0));
+}
+
+/*
+VAR:228 4 1 sread text parse
+
+4 sread text parse time routine
+5 aread text parse time routine -> (result) 
+*/
+void z_read()
+{
+    printf("done");
+    exit(1);
 }

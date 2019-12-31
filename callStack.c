@@ -9,11 +9,12 @@ void callStack_initialize()
     top = NULL;
 }
 
-void callStack_push(functionData value)
+//void callStack_push(functionData value)
+void callStack_push()
 {
     node *tmp;
     tmp = malloc(sizeof(node));
-    tmp -> data = value;
+    //tmp -> data = value;
     tmp -> next = top;
     if (top != NULL)
     {
@@ -38,9 +39,9 @@ functionData callStack_pop()
     return n;
 }
 
-functionData callStack_top()
+functionData* callStack_top()
 {
-    return top->data;
+    return &(top->data);
 }
 
 int callStack_isEmpty()
