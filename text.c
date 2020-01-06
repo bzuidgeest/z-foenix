@@ -18,15 +18,16 @@ ushort text_abbreviationtableAddress = 0;
 
 void text_initialize(byte version, ushort abbreviationtableAddress)
 {
+    byte i = 0;
     text_version = version;
     text_abbreviationtableAddress = abbreviationtableAddress;
 
     if (version == 1)
     {
         // adjust alphabet table for version 1
-        for (byte i = 2; i < 22; i++)
+        for (i = 2; i < 22; i++)
         {
-            text_alphabet[2][i - 1] = text_alphabet[i];
+            text_alphabet[2][i - 1] = text_alphabet[2][i];
         }
         text_alphabet[2][21] = '<';
     }
@@ -46,6 +47,7 @@ Text in memory consists of a sequence of 2-byte words. Each word is divided into
 
 The bit is set only on the last 2-byte word of the text, and so marks the end. 
 */
+/*
 char * readText(ushort address, byte length)
 {
     char output[length * 3];
@@ -74,7 +76,7 @@ char * readText(ushort address, byte length)
 
     return output;
 }
-
+*/
 ushort text_printLiteral(ushort startAddress)
 {
     short encodedText = 0;

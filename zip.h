@@ -1,9 +1,9 @@
-//#define byte u_int8_t
 
-typedef u_int16_t ushort;
-typedef u_int8_t byte;
 
-u_int8_t *zorkData;
+typedef unsigned short ushort;
+typedef unsigned char byte;
+
+//u_int8_t *zorkData;
 
 void z_add(void);
 void z_sub(void);
@@ -37,3 +37,13 @@ void z_print_obj(void);
 void z_get_parent(void);
 void z_get_prop(void);
 void z_get_child(void);
+void z_get_sibling(void);
+void z_inc(void);
+void z_jl(void);
+void z_ret_popped(void);
+void z_read(void);
+
+void returnfromRoutine(short returnValue);
+void branchTo(int value);
+void storeResult(short value);
+

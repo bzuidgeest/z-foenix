@@ -1,13 +1,10 @@
-#include <unistd.h>
-#include <fcntl.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h> 
-#include <sys/stat.h>
-#include <sys/types.h>
 #include "object.h"
-#include "zip.h"
-#include "text.h"
 
+// Zork data
+extern byte *zorkData;
 
 /*
 12.1
@@ -254,14 +251,14 @@ table address in play, provided the new address points to another valid properti
 where the text-length is the number of 2-byte words making up the text, which is stored in the usual format. (This means that an object's short 
 name is limited to 765 Z-characters.) After the header, the properties are listed in descending numerical order. (This order is essential and is not a 
 matter of convention.)
-*/
+*//*
 char * objecttable_getObjectName(ushort objectNumber)
 {
     ushort propertyTableAddress = objecttable_getObjectPropertyTableAddress(objectNumber);
     byte length = zorkData[propertyTableAddress];
     char *name = readText(propertyTableAddress + 1, length);
     return *name;
-}
+}*/
 
 ushort objecttable_getObjectNameAddress(ushort objectNumber)
 {
@@ -340,7 +337,8 @@ void objecttable_insertObject(ushort sourceObjectNumber, ushort destinationObjec
     // find object addresses for both objects
     ushort sourceObjectAddress = objecttable_getObjectAddress(sourceObjectNumber);
     ushort destinationObjectAddress = objecttable_getObjectAddress(destinationObjectNumber);
-
+    // get first child of destionation object
+    ushort firstChildOfDestination = objecttable_getObjectChild(destinationObjectNumber);
 
     // remove object from its current location in the tree and stitch tree back together
     ushort sourceObjectParent = objecttable_getObjectParent(sourceObjectNumber);
@@ -350,8 +348,7 @@ void objecttable_insertObject(ushort sourceObjectNumber, ushort destinationObjec
         exit(1);
     }
 
-    // get first child of destionation object
-    ushort firstChildOfDestination = objecttable_getObjectChild(destinationObjectNumber);
+    
     //ushort firstChildOfDestinationAddress = objecttable_getObjectAddress(firstChildOfDestination);
     
     // insert source object before first child of destination object

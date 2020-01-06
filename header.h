@@ -1,47 +1,55 @@
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h> 
-#include <sys/stat.h>
-#include <sys/types.h>
-
 #define SWAP16(x) (x>>8) | (x<<8)
+
+typedef unsigned short ushort;
+typedef unsigned char byte;
 
 struct header
 {
-    u_int8_t version;
-    u_int8_t flags1;
-    u_int16_t release; 
-    u_int16_t highMemoryStart;
-    u_int16_t programCounterInitial;
-    u_int16_t dictionaryLocation;
-    u_int16_t objectTableLocation;
-    u_int16_t globalVariableLocation;
-    u_int16_t staticMemoryLocation;
-    u_int16_t flags2; /* spec says byte but frotz has word, posibly for easier parsing, also need fille byte before serial */
-    u_int8_t serial[6]; 
-    u_int16_t abbreviationsLocation;
-    u_int16_t fileLength;
-    u_int16_t fileChecksum;
-    u_int8_t interpreterNumber;
-    u_int8_t interpreterVersion;
-    u_int8_t screenHeightLines;
-    u_int8_t screenWidthChars;
-    u_int16_t screenWidthUnits;
-    u_int16_t screenheightUnits;
-    u_int8_t fontHeight;
-    u_int8_t fontWidth;
-    u_int16_t routineOffset;
-    u_int16_t stringOffset;
-    u_int8_t defaultBackgroundColor;
-    u_int8_t defaultForegroundColor;
-    u_int16_t terminatingCharAddress;
-    u_int16_t outputStream3pixelWidth;
-    u_int16_t revisionNumber;
-    u_int16_t alphabetTableAddress;
-    u_int16_t headerExtensionTableAddress;
-    u_int8_t username[8];
+    byte version;
+    byte flags1;
+    unsigned short release; 
+    unsigned short highMemoryStart;
+    unsigned short programCounterInitial;
+    unsigned short dictionaryLocation;
+    unsigned short objectTableLocation;
+    unsigned short globalVariableLocation;
+    unsigned short staticMemoryLocation;
+    unsigned short flags2; /* spec says byte but frotz has word, posibly for easier parsing, also need fille byte before serial */
+    byte serial[6]; 
+    unsigned short abbreviationsLocation;
+    unsigned short fileLength;
+    unsigned short fileChecksum;
+    byte interpreterNumber;
+    byte interpreterVersion;
+    byte screenHeightLines;
+    byte screenWidthChars;
+    unsigned short screenWidthUnits;
+    unsigned short screenheightUnits;
+    byte fontHeight;
+    byte fontWidth;
+    unsigned short routineOffset;
+    unsigned short stringOffset;
+    byte defaultBackgroundColor;
+    byte defaultForegroundColor;
+    unsigned short terminatingCharAddress;
+    unsigned short outputStream3pixelWidth;
+    unsigned short revisionNumber;
+    unsigned short alphabetTableAddress;
+    unsigned short headerExtensionTableAddress;
+    byte username[8];
 
 };
 
-struct header *zorkHeader;
+extern struct header *zorkHeader;
+
+ushort getRelease(void);
+ushort getInitialProgramCounter(void);
+ushort getDictionaryLocation(void);
+ushort getObjectTableLocation(void);
+ushort getGlobalVariableLocation(void);
+ushort getStaticMemoryLocation(void);
+ushort getHighMemoryStart(void);
+ushort getAbbreviationsLocation(void);
+ushort getAlphabetTableAddress(void);
+ushort getRoutineOffset(void);
+ushort getStringOffset(void);

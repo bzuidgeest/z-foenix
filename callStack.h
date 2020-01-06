@@ -1,5 +1,4 @@
-#include <unistd.h>
-#include <fcntl.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h> 
 #include <sys/stat.h>
@@ -10,9 +9,9 @@
 struct functionData
 {
     short locals[16];
-    u_int16_t returnAddress;
-    u_int16_t returnValueStorage;
-    u_int16_t returnStackSize;
+    unsigned short returnAddress;
+    unsigned short returnValueStorage;
+    unsigned short returnStackSize;
 
 };
 typedef struct functionData functionData;
@@ -25,7 +24,7 @@ struct node
 };
 typedef struct node node;
 
-node *top;
+extern node *top;
 
 void callStack_initialize();
 void callStack_push();

@@ -1,64 +1,62 @@
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h>
+#include <stddef.h>
+//#include <stdio.h>
 #include <stdlib.h> 
-#include <sys/stat.h>
-#include <sys/types.h>
 #include "header.h"
 
+struct header *zorkHeader;
 
-u_int16_t getRelease()
+ushort getRelease()
 {
     return SWAP16(zorkHeader->release);
 }
 
-u_int16_t getInitialProgramCounter()
+ushort getInitialProgramCounter()
 {
     return SWAP16(zorkHeader->programCounterInitial);
 }
 
-u_int16_t getDictionaryLocation()
+ushort getDictionaryLocation()
 {
     return SWAP16(zorkHeader->dictionaryLocation);
 }
 
-u_int16_t getObjectTableLocation()
+ushort getObjectTableLocation()
 {
     return SWAP16(zorkHeader->objectTableLocation);
 }
 
-u_int16_t getGlobalVariableLocation()
+ushort getGlobalVariableLocation()
 {
     return SWAP16(zorkHeader->globalVariableLocation);
 }
 
-u_int16_t getStaticMemoryLocation()
+ushort getStaticMemoryLocation()
 {
     return SWAP16(zorkHeader->staticMemoryLocation);
 }
 
-u_int16_t getHighMemoryStart()
+ushort getHighMemoryStart()
 {
     return SWAP16(zorkHeader->highMemoryStart);
 }
 
-u_int16_t getAbbreviationsLocation()
+ushort getAbbreviationsLocation()
 {
     return SWAP16(zorkHeader->abbreviationsLocation);
 }
 
-u_int16_t getAlphabetTableAddress()
+ushort getAlphabetTableAddress()
 {
     return SWAP16(zorkHeader->alphabetTableAddress);
 }
 
-u_int16_t getRoutineOffset()
+ushort getRoutineOffset()
 {
     // spec 11.1.0
     return SWAP16(zorkHeader->routineOffset) * 8;
 }
 
-u_int16_t getStringOffset()
+ushort getStringOffset()
 {
     // spec 11.1.0
     return SWAP16(zorkHeader->stringOffset) * 8;

@@ -34,14 +34,14 @@ short storeLocation;
 
 int instructionCount = -1;
 
-//u_int8_t *zorkData;
+byte *zorkData;
 extern struct header *zorkHeader;
 
 struct stack *stack;
 
 //u_int8_t currentInstruction;
 
-u_int16_t programCounter;
+ushort programCounter;
 short globals[240];
 
 int main()
@@ -119,9 +119,11 @@ int main()
 
 void initialize(void)
 {
+    byte i = 0;
 	ushort address = getGlobalVariableLocation();
-	// load initial values for globals
-	for(byte i = 0; i < 240; i++)
+	
+    	// load initial values for globals
+	for(i = 0; i < 240; i++)
 	{
 		globals[i] = (zorkData[address] << 8) + zorkData[address + 1];
 		address += 2;
@@ -133,17 +135,10 @@ void initialize(void)
 
 void gameLoop()
 {
-    programCounter = getInitialProgramCounter();
-   
-
-    printf("\n");
-    //u_int16_t operands[8];
-    //u_int8_t operandTypes[8];
-
-    // Clear operandtypes
-    //memset(operandTypes, 0, 8);
-
     byte tempByte;
+
+    programCounter = getInitialProgramCounter();
+    
     do
     {
         #ifdef DEBUG
@@ -153,7 +148,6 @@ void gameLoop()
         instructionCount++;
 
         ReadInstruction();
-        //currentInstruction = zorkData[programCounter++]; 
 		
         #ifdef DEBUG
         printf(" OPCODE: 0x%X (%d) instruction: %d\n", opcode, opcode, instructionCount);
@@ -373,6 +367,9 @@ void gameLoop()
 
 void ReadInstruction()
 {
+    short i = 0;
+    byte tempByte = 0;
+
     // Clear operandtypes and operands
     memset(operandType, 0, 8);
     memset(operands, 0, 8);
@@ -462,9 +459,11 @@ void ReadInstruction()
     // variable operand count opcodes
     if (opcode >= 0xC0 && opcode < 0xFF)
     {
-        byte tempByte = zorkData[programCounter++];
+        
+        tempByte = zorkData[programCounter++];
+        
         // get operand types
-        for (short i = 3; i >= 0; i--)
+        for (i = 3; i >= 0; i--)
         {
             operandType[i] = tempByte & 0x03;
             tempByte = tempByte >> 2;
@@ -475,7 +474,7 @@ void ReadInstruction()
         {
             // Load second operand byte
             tempByte = zorkData[programCounter++];
-            for (short i = 7; i >= 4; i--)
+            for (i = 7; i >= 4; i--)
             {
                 operandType[i] = tempByte & 0x03;
                 tempByte = tempByte >> 2;
@@ -489,8 +488,7 @@ void ReadInstruction()
         
 
         // Read operands
-        //for(int i = 0; operandType[i] != 0x3 && i < 8; i++)
-        for(int i = 0; operandType[i] != 0x3 && i < 8; i++)
+        for(i = 0; operandType[i] != 0x3 && i < 8; i++)
         {
             switch(operandType[i])
             {
@@ -608,18 +606,19 @@ Address after branch data + Offset - 2.
 */
 void branchTo(int value)
 {
-    byte branchByte1 = zorkData[programCounter++];
     short branchOffset = 0;
+    byte branchByte1 = 0;
+    branchByte1 = zorkData[programCounter++];
 
-    if ((branchByte1 & 0b01000000) == 0)
+    if ((branchByte1 & 0x40) == 0)
     {
         // 2 byte offset
-        branchOffset = ((branchByte1 & 0b00111111) << 8) + zorkData[programCounter++];
+        branchOffset = ((branchByte1 & 0x3F) << 8) + zorkData[programCounter++];
     }
     else
     {
         // 1 byte offset
-        branchOffset = (branchByte1 & 0b00111111);
+        branchOffset = (branchByte1 & 0x3F);
     }
     
     if ((branchByte1 >> 7 && value == 1) || ((branchByte1 >> 7) == 0 && value == 0))
@@ -688,6 +687,9 @@ as supplied and stores the resulting return value. (When the address 0 is called
 */
 void z_call_vs(void)
 {
+    short i = 0;
+    ushort x;
+
     if(operands[0] == 0)
     {
         storeResult(0);
@@ -710,20 +712,20 @@ void z_call_vs(void)
 	
 	// read number of locals in routine
 	// fix packed addressess implement 1.2.3 here 
-	u_int16_t x = zorkData[operands[0] << 1]; // (left shift 1 gives *2)
+	x = zorkData[operands[0] << 1]; // (left shift 1 gives *2)
 	//fd.locals = malloc(x * 2); // times two as short is two bytes per item
 	
     // Clear and load locals from routine header
 	//memset(fd.locals, 0, x * 2);
     memset(callStack_top()->locals, 0, 15 * 2);
-	for (int i = 0; (i / 2) < x; i += 2)
+	for (i = 0; (i / 2) < x; i += 2)
 	{
         callStack_top()->locals[i / 2] = (zorkData[(operands[0] << 1) + 1 + i] << 8) + zorkData[(operands[0] << 1) + 2 + i];
 	}
 
     // set locals from function operands
     // first operand is routine address so skip that.
-    for (int i = 1; operandType[i] != 0x03; i++)
+    for (i = 1; operandType[i] != 0x03; i++)
 	{
         callStack_top()->locals[i - 1] = operands[i];
 	}
@@ -741,6 +743,8 @@ void z_call_vs(void)
 
 void z_je(void)
 {
+    short i = 0;
+    ushort result = 0;
 
     if (opcode != 0xC1)
     {
@@ -748,8 +752,7 @@ void z_je(void)
     }
     else
     {
-        ushort result = 0;
-        for (int i = 1; operandType[i] != 3; i++)
+        for (i = 1; operandType[i] != 3; i++)
         {
             if (operands[0] == operands[i])
                 result = 1;

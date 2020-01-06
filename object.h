@@ -1,11 +1,9 @@
-#include <unistd.h>
-#include <fcntl.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h> 
-#include <sys/stat.h>
-#include <sys/types.h>
-#include "zip.h"
 
+typedef unsigned short ushort;
+typedef unsigned char byte;
 
 ushort objecttableAddress;
 byte objecttableVersion;
