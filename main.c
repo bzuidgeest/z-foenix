@@ -36,7 +36,7 @@ short storeLocation;
 int instructionCount = -1;
 
 //byte *zorkData;
-extern struct header zorkHeader;
+extern struct header* zorkHeader;
 
 struct stack *stack;
 
@@ -88,8 +88,9 @@ void initialize(void)
     header_initialise("/home/bart/ZIP/ZORK1.DAT");
     data_initialise(getHighMemoryStart(), "/home/bart/ZIP/ZORK1.DAT");
 
-    //free(zorkHeader);
-    //zorkHeader = &zData;
+    // free data from initial load and retarget pointer to main data array
+    free(zorkHeader);
+    zorkHeader = zData;
 
     address = getGlobalVariableLocation();
 
@@ -104,8 +105,8 @@ void initialize(void)
 		address += 2;
 	}
 
-    objecttable_initialize(getObjectTableLocation(), zorkHeader.version);
-    text_initialize(zorkHeader.version, getAbbreviationsLocation());
+    objecttable_initialize(getObjectTableLocation(), zorkHeader->version);
+    text_initialize(zorkHeader->version, getAbbreviationsLocation());
 }
 
 void gameLoop()
@@ -260,7 +261,7 @@ void gameLoop()
         }
 
         /* Extended instructions for level 5 and above */
-        if (opcode == 0xBE && zorkHeader.version >= 5)
+        if (opcode == 0xBE && zorkHeader->version >= 5)
         {
 			printf("unimplemented opcode D: %d\n", opcode);
             exit(1);
@@ -903,7 +904,7 @@ void z_put_prop(void)
     }
 
     /* Property id is in bottom five or six bits */
-    propertyNumberMask = (zorkHeader.version <= 3) ? 0x1f : 0x3f;
+    propertyNumberMask = (zorkHeader->version <= 3) ? 0x1f : 0x3f;
 
     /* Load address of first property */
     propertyAdress = objecttable_getFirstPropertyAddress(operands[0]);
@@ -928,7 +929,7 @@ void z_put_prop(void)
     // skip the length byte V1+
     propertyAdress++;
 
-    if ((zorkHeader.version <= 3 && !(value & 0xe0)) || (zorkHeader.version >= 4 && !(value & 0xc0))) 
+    if ((zorkHeader->version <= 3 && !(value & 0xe0)) || (zorkHeader->version >= 4 && !(value & 0xc0))) 
     {
 	    //zorkData[propertyAdress] = operands[2] & 0xFF;
         data_saveByte(propertyAdress, operands[2]);
@@ -1118,7 +1119,7 @@ In Version 6, the stack in question may be specified as a user one: otherwise it
 */
 void z_pull(void)
 {
-    if (zorkHeader.version < 6)
+    if (zorkHeader->version < 6)
     {
         storeVariable(operands[0], stack_pop(stack));
     }
