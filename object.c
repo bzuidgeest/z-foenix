@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h> 
 #include "object.h"
+#include "data.h"
 
 // Zork data
-extern byte *zorkData;
+//extern byte *zorkData;
 
 /*
 12.1
@@ -41,7 +42,7 @@ short objecttable_getDefaultProperty(short number)
 {
     if ((objecttableVersion < 4 && number < 31) || (objecttableVersion >= 4 && number < 63))
     {
-        return (zorkData[objecttableAddress + number] << 8) + zorkData[objecttableAddress + number + 1];
+        return data_loadWord(objecttableAddress + number);
     }
     else
     {
@@ -108,11 +109,11 @@ ushort objecttable_getObjectParent(ushort objectNumber)
 
     if(objecttableVersion < 4)
     {
-        return zorkData[objectAddress + 4];
+        return data_loadByte(objectAddress + 4);
     }
     else
     {
-        return zorkData[(objectAddress + 6) << 8] + zorkData[objectAddress + 7];
+        return data_loadWord(objectAddress + 6);
     }
 }
 
@@ -120,12 +121,14 @@ void objecttable_setObjectParent(ushort objectAddress, ushort value)
 {
     if(objecttableVersion < 4)
     {
-        zorkData[objectAddress + 4] = value & 0xFF;
+        //zorkData[objectAddress + 4] = value & 0xFF;
+        data_saveByte(objectAddress + 4, value);
     }
     else
     {
-        zorkData[objectAddress + 6] = (value >> 8) & 0xFF;
-        zorkData[objectAddress + 7] = (value) & 0xFF;
+        //zorkData[objectAddress + 6] = (value >> 8) & 0xFF;
+        //zorkData[objectAddress + 7] = (value) & 0xFF;
+        data_saveWord(objectAddress + 6, value);
     }
 }
 
@@ -137,11 +140,11 @@ ushort objecttable_getObjectChild(ushort objectNumber)
 
     if(objecttableVersion < 4)
     {
-        return zorkData[objectAddress + 6];
+        return data_loadByte(objectAddress + 6);
     }
     else
     {
-        return zorkData[(objectAddress + 10) << 8] + zorkData[objectAddress + 11];
+        return data_loadWord(objectAddress + 10);
     }
 }
 
@@ -149,12 +152,14 @@ void objecttable_setObjectChild(ushort objectAddress, ushort value)
 {
     if(objecttableVersion < 4)
     {
-        zorkData[objectAddress + 6] = value & 0xFF;
+        //zorkData[objectAddress + 6] = value & 0xFF;
+        data_saveByte(objectAddress + 6, value);
     }
     else
     {
-        zorkData[objectAddress + 10] = (value >> 8) & 0xFF;
-        zorkData[objectAddress + 11] = (value) & 0xFF;
+        //zorkData[objectAddress + 10] = (value >> 8) & 0xFF;
+        //zorkData[objectAddress + 11] = (value) & 0xFF;
+        data_saveWord(objectAddress + 10, value);
     }
 }
 
@@ -165,11 +170,11 @@ ushort objecttable_getObjectSibling(ushort objectNumber)
 
     if(objecttableVersion < 4)
     {
-        return zorkData[objectAddress + 5];
+        return data_loadByte(objectAddress + 5);
     }
     else
     {
-        return zorkData[(objectAddress + 8) << 8] + zorkData[objectAddress + 9];
+        return data_loadWord(objectAddress + 8);
     }
 }
 
@@ -177,12 +182,14 @@ void objecttable_setObjectSibling(ushort objectAddress, ushort value)
 {
      if(objecttableVersion < 4)
     {
-        zorkData[objectAddress + 5] = value & 0xFF;
+        //zorkData[objectAddress + 5] = value & 0xFF;
+        data_saveByte(objectAddress + 5, value);
     }
     else
     {
-        zorkData[objectAddress + 8] = (value >> 8) & 0xFF;
-        zorkData[objectAddress + 9] = (value) & 0xFF;
+        //zorkData[objectAddress + 8] = (value >> 8) & 0xFF;
+        //zorkData[objectAddress + 9] = (value) & 0xFF;
+        data_saveWord(objectAddress + 8, value);
     }
 }
 
@@ -193,11 +200,11 @@ ushort objecttable_getObjectPropertyTableAddress(ushort objectNumber)
 
     if(objecttableVersion < 4)
     {
-        return (zorkData[objectAddress + 7] << 8) + (zorkData[objectAddress + 8]);
+        return data_loadWord(objectAddress + 7);
     }
     else
     {
-        return (zorkData[objectAddress + 12] << 8) + (zorkData[objectAddress + 13]);
+        return data_loadWord(objectAddress + 12);
     }
 }
 
@@ -211,7 +218,7 @@ byte objecttable_getObjectAttribute(ushort objectNumber, ushort attributeNumber)
         // for every 8 bit get the next byte using division
         // then shift the byte modules 8 to the right to get the interesting bit at pos 0
         // then use "and" 1 to check if that bit is set and return
-        return (zorkData[objectAddres + (attributeNumber / 8)] >> (7 - (attributeNumber % 8))) & 0x01; 
+        return (data_loadByte(objectAddres + (attributeNumber / 8)) >> (7 - (attributeNumber % 8))) & 0x01; 
     }
     else
     {
@@ -230,7 +237,7 @@ void objecttable_setObjectAttribute(ushort objectNumber, ushort attributeNumber)
         // for every 8 bit get the next byte using division
         // then shift the byte modules 8 to the left to get the interesting bit at the attribute position in the current byte
         // then use "or" 1 to set that bit for the object.
-        zorkData[objectAddres + (attributeNumber / 8)] | (0x01 << (7 - (attributeNumber % 8))); 
+        data_loadByte(objectAddres + (attributeNumber / 8)) | (0x01 << (7 - (attributeNumber % 8))); 
     }
     else
     {
@@ -300,16 +307,16 @@ ushort objecttable_getFirstPropertyAddress(ushort objectNumber)
 {
     ushort propertytableAddress = objecttable_getObjectPropertyTableAddress(objectNumber);
     // First property of an object should be start of property table + the lenght byte of the object name + object name bytes.
-    return propertytableAddress + zorkData[propertytableAddress] * 2 + 1;
+    return propertytableAddress + data_loadByte(propertytableAddress) * 2 + 1;
 }
 
 ushort objecttable_getNextPropertyAddress(ushort propertyAddress)
 {
-    short value = zorkData[propertyAddress];
+    short value = data_loadByte(propertyAddress);
     // add 1 for the size byte, moves to second size byte for V4+
     propertyAddress++;
 
-    if (zorkData[0] <= 3)
+    if (data_loadByte(0) <= 3)
     {
         value >>= 5;
     }
@@ -319,7 +326,8 @@ ushort objecttable_getNextPropertyAddress(ushort propertyAddress)
     }
     else 
     {
-	    value = zorkData[propertyAddress] &= 0x3f;
+	    value = data_loadByte(propertyAddress); 
+        value &= 0x3f;
 	    if (value == 0) value = 64;	/* demanded by Spec 1.0 */
     }
 
@@ -367,22 +375,22 @@ short objecttable_getPropertyShort(ushort objectNumber, ushort propertyNumber)
 
     if (objecttableVersion <= 3)
     {
-        while ((zorkData[propertyAddress] & mask) > propertyNumber && zorkData[propertyAddress] != 0)
+        while ((data_loadByte(propertyAddress) & mask) > propertyNumber && data_loadByte(propertyAddress) != 0)
         {
             propertyAddress = objecttable_getNextPropertyAddress(propertyAddress);
         }
 
-        if ((zorkData[propertyAddress] & mask) == propertyNumber)
+        if ((data_loadByte(propertyAddress) & mask) == propertyNumber)
         {
             // get property
-            byte size = (zorkData[propertyAddress]) >> 5;
+            byte size = data_loadByte(propertyAddress) >> 5;
             if (size == 0)
             {
-                return (zorkData[propertyAddress + 1]);
+                return data_loadByte(propertyAddress + 1);
             }
             else
             {
-                return ((zorkData[propertyAddress + 1]) << 8) + (zorkData[propertyAddress + 2]);
+                return data_loadWord(propertyAddress + 1);
             }
         }
         else

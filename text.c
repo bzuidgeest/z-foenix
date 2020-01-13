@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include "text.h"
 #include "zip.h"
+#include "data.h"
 
 char text_alphabet[3][26] = {
     { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' }, 
@@ -92,7 +93,8 @@ ushort text_printLiteral(ushort startAddress)
     while ((encodedText >> 16) == 0)
     {
         // read next two bytes encoding next three characters.
-        encodedText = (zorkData[startAddress++] << 8) + zorkData[startAddress++];
+        encodedText = data_loadWord(startAddress);
+        startAddress += 2;
         byteCounter += 2;
 
         text[0] = (encodedText & 0x7C00) >> 10;
@@ -105,7 +107,7 @@ ushort text_printLiteral(ushort startAddress)
             {
                 // The formula in the spec is wrong. It does not account for the fact dat the abbreviationtable has 2 bytes for every address
                 ushort index = text_abbreviationtableAddress + (64 * (printAbbreviation - 1) + 2 * text[counter]);
-                ushort waddress = (zorkData[index] << 8) + zorkData[index + 1];
+                ushort waddress = data_loadWord(index);
                 //ushort waddress = (zorkData[text_abbreviationtableAddress + text[counter]] << 8) + zorkData[text_abbreviationtableAddress + text[counter] + 1];
                 text_printLiteral(waddress << 1);
 

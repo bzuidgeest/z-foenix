@@ -6,7 +6,7 @@
         {
             "label": "build main.c",
             "type": "shell",
-            "command": "gcc -Wall -g main.c header.c stack.c callStack.c object.c text.c -o main",
+            "command": "gcc -Wall -g main.c header.c stack.c callStack.c object.c text.c data.c -o main",
             "group": {
                 "kind": "build",
                 "isDefault": true

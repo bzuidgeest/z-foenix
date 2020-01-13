@@ -8,6 +8,7 @@
 #include "stack.h"
 #include "zip.h"
 #include "callStack.h"
+#include "data.h"
 
 #define DEBUGx
 
@@ -34,8 +35,8 @@ short storeLocation;
 
 int instructionCount = -1;
 
-byte *zorkData;
-extern struct header *zorkHeader;
+//byte *zorkData;
+extern struct header zorkHeader;
 
 struct stack *stack;
 
@@ -55,45 +56,7 @@ int main()
     //create the callstack
     // fix in later version we start in "main" function, might need to push a functionData struct on the callstack for that.
     callStack_initialize();
-    
-
-    FILE * fp;
-
-    fp = fopen ("/home/bart/ZIP/ZORK1.DAT", "rb");
-    char fileText[100];
-    fgets(fileText, 100, fp);
-    printf("first 100 char: %s\n", fileText);
-    char cwd[2048];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-       printf("Current working dir: %s\n", cwd);
-    }
-    struct stat fileStat;
-    if (fstat(fileno(fp),&fileStat) < 0)    
-        return 1;
- 
-    printf("File Size: \t\t%d bytes\n",fileStat.st_size);   
-   
-    /* size array for data archive */
-    // allocate memory to contain the whole file:
-    zorkData = (u_int8_t*) malloc (sizeof(u_int8_t) * fileStat.st_size);
-    if (zorkData == NULL) {fputs ("Memory error",stderr); exit (2);}
-    
-    /* make sure we are at the start of the file */
-    fseek(fp, 0, SEEK_SET);
-    
-    /* read data archive into array */
-    int bytesRead = fread(zorkData, 1, fileStat.st_size, fp);
-    
-    if (bytesRead == fileStat.st_size)
-        printf("File read succesfully");
-    else
-    {
-        printf("I could only read %d bytes.", bytesRead);
-    }
-    
-    /* stick header to array */
-    zorkHeader = zorkData;
-
+/*
     u_int16_t a = getInitialProgramCounter();
     u_int16_t b = getRelease();
 
@@ -103,14 +66,14 @@ int main()
     u_int16_t f = getHighMemoryStart();
     u_int16_t g = getAbbreviationsLocation();
     u_int16_t h = getAlphabetTableAddress();
-
-    fclose(fp);
+*/
+    
     
     printf("\n\n\n");
     // initialize stuff
-    //globals = &zorkData[getGlobalVariableLocation()];
 	initialize();
 
+    // play game
     gameLoop();
 
     //printf("Hello, World!");
@@ -120,17 +83,29 @@ int main()
 void initialize(void)
 {
     byte i = 0;
-	ushort address = getGlobalVariableLocation();
+	ushort address = 0;
 	
+    header_initialise("/home/bart/ZIP/ZORK1.DAT");
+    data_initialise(getHighMemoryStart(), "/home/bart/ZIP/ZORK1.DAT");
+
+    //free(zorkHeader);
+    //zorkHeader = &zData;
+
+    address = getGlobalVariableLocation();
+
+    /* stick header to array */
+    //zorkHeader = zData;
+    
+
     	// load initial values for globals
 	for(i = 0; i < 240; i++)
 	{
-		globals[i] = (zorkData[address] << 8) + zorkData[address + 1];
+		globals[i] = data_loadWord(address);
 		address += 2;
 	}
 
-    objecttable_initialize(getObjectTableLocation(), zorkHeader->version);
-    text_initialize(zorkHeader->version, getAbbreviationsLocation());
+    objecttable_initialize(getObjectTableLocation(), zorkHeader.version);
+    text_initialize(zorkHeader.version, getAbbreviationsLocation());
 }
 
 void gameLoop()
@@ -285,7 +260,7 @@ void gameLoop()
         }
 
         /* Extended instructions for level 5 and above */
-        if (opcode == 0xBE && zorkHeader->version >= 5)
+        if (opcode == 0xBE && zorkHeader.version >= 5)
         {
 			printf("unimplemented opcode D: %d\n", opcode);
             exit(1);
@@ -374,7 +349,7 @@ void ReadInstruction()
     memset(operandType, 0, 8);
     memset(operands, 0, 8);
 
-    opcode = zorkData[programCounter++];
+    opcode = data_loadByte(programCounter++);
 
     // 2 operand
     if (opcode <= 0x7F) 
@@ -382,29 +357,29 @@ void ReadInstruction()
         switch ((opcode >> 5))
         {
             case 0: // smallconstant smallconstant
-                operands[0] = zorkData[programCounter++];
-                operands[1] = zorkData[programCounter++];
+                operands[0] = data_loadByte(programCounter++);
+                operands[1] = data_loadByte(programCounter++);
                 operandType[0] = 0x01;
                 operandType[1] = 0x01;
                 operandType[2] = 0x03;
                 break;
             case 1: // smallconstant variablenumber
-                operands[0] = zorkData[programCounter++];
-                operands[1] = loadVariable(zorkData[programCounter++]);
+                operands[0] = data_loadByte(programCounter++);
+                operands[1] = loadVariable(data_loadByte(programCounter++));
                 operandType[0] = 0x01;
                 operandType[1] = 0x02;
                 operandType[2] = 0x03;
                 break;
             case 2: // variable small
-                operands[0] = loadVariable(zorkData[programCounter++]);
-                operands[1] = zorkData[programCounter++];
+                operands[0] = loadVariable(data_loadByte(programCounter++));
+                operands[1] = data_loadByte(programCounter++);
                 operandType[0] = 0x02;
                 operandType[1] = 0x01;
                 operandType[2] = 0x03;
                 break;
             case 3: // variable variable
-                operands[0] = loadVariable(zorkData[programCounter++]);
-                operands[1] = loadVariable(zorkData[programCounter++]);
+                operands[0] = loadVariable(data_loadByte(programCounter++));
+                operands[1] = loadVariable(data_loadByte(programCounter++));
                 operandType[0] = 0x02;
                 operandType[1] = 0x02;
                 operandType[2] = 0x03;
@@ -423,24 +398,25 @@ void ReadInstruction()
         switch ((opcode >> 4) & 0x03)
         {
             case 0: // largeconstant
-                operands[0] = (zorkData[programCounter++] << 8) + zorkData[programCounter++];
+                operands[0] = data_loadWord(programCounter);
+                programCounter +=2;
                 operandType[0] = 0x00;
                 operandType[1] = 0x03;
                 break;
             case 1: // smallconstant
-                operands[0] = zorkData[programCounter++];
+                operands[0] = data_loadByte(programCounter++);
                 operandType[0] = 0x01;
                 operandType[1] = 0x03;
                 break;
             case 2: // variable
-                operands[0] = loadVariable(zorkData[programCounter++]);
+                operands[0] = loadVariable(data_loadByte(programCounter++));
                 operandType[0] = 0x02;
                 operandType[1] = 0x03;
                 break;
             case 3: // zero op or extended op
                 if (opcode == 0xBE)
                 {
-                    opcodeExtended = zorkData[programCounter++];
+                    opcodeExtended = data_loadByte(programCounter++);
 					printf("Extended opcode, need to implement operand loading!");
                     // fix load operands
                 }
@@ -460,7 +436,7 @@ void ReadInstruction()
     if (opcode >= 0xC0 && opcode < 0xFF)
     {
         
-        tempByte = zorkData[programCounter++];
+        tempByte = data_loadByte(programCounter++);
         
         // get operand types
         for (i = 3; i >= 0; i--)
@@ -473,7 +449,7 @@ void ReadInstruction()
         if (opcode == 0xEC || opcode == 0xFA)
         {
             // Load second operand byte
-            tempByte = zorkData[programCounter++];
+            tempByte = data_loadByte(programCounter++);
             for (i = 7; i >= 4; i--)
             {
                 operandType[i] = tempByte & 0x03;
@@ -493,14 +469,15 @@ void ReadInstruction()
             switch(operandType[i])
             {
                 case 0x0:
-                    operands[i] = zorkData[programCounter++] << 8 | zorkData[programCounter++];
+                    operands[i] = data_loadWord(programCounter);
+                    programCounter += 2;
                     break;
                 case 0x1:
-                    operands[i] = zorkData[programCounter++];
+                    operands[i] = data_loadByte(programCounter++);
                     break;
                 case 0x2:
                     // get variable number
-                    operands[i] = loadVariable(zorkData[programCounter++]);
+                    operands[i] = loadVariable(data_loadByte(programCounter++));
                     break;
             }
         }
@@ -534,7 +511,7 @@ Such instructions must be followed by a single byte giving the variable number o
 */
 void storeResult(short value)
 {
-	ushort storeLocation = zorkData[programCounter++];
+	ushort storeLocation = data_loadByte(programCounter++);
 
     if (storeLocation == 0)
     {
@@ -608,12 +585,12 @@ void branchTo(int value)
 {
     short branchOffset = 0;
     byte branchByte1 = 0;
-    branchByte1 = zorkData[programCounter++];
+    branchByte1 = data_loadByte(programCounter++);
 
     if ((branchByte1 & 0x40) == 0)
     {
         // 2 byte offset
-        branchOffset = ((branchByte1 & 0x3F) << 8) + zorkData[programCounter++];
+        branchOffset = ((branchByte1 & 0x3F) << 8) + data_loadByte(programCounter++);
     }
     else
     {
@@ -712,7 +689,7 @@ void z_call_vs(void)
 	
 	// read number of locals in routine
 	// fix packed addressess implement 1.2.3 here 
-	x = zorkData[operands[0] << 1]; // (left shift 1 gives *2)
+	x = data_loadByte(operands[0] << 1); // (left shift 1 gives *2)
 	//fd.locals = malloc(x * 2); // times two as short is two bytes per item
 	
     // Clear and load locals from routine header
@@ -720,7 +697,8 @@ void z_call_vs(void)
     memset(callStack_top()->locals, 0, 15 * 2);
 	for (i = 0; (i / 2) < x; i += 2)
 	{
-        callStack_top()->locals[i / 2] = (zorkData[(operands[0] << 1) + 1 + i] << 8) + zorkData[(operands[0] << 1) + 2 + i];
+        //callStack_top()->locals[i / 2] = (data_loadByte((operands[0] << 1) + 1 + i) << 8) + data_loadByte((operands[0] << 1) + 2 + i);
+        callStack_top()->locals[i / 2] = data_loadWord((operands[0] << 1) + 1 + i);
 	}
 
     // set locals from function operands
@@ -779,13 +757,13 @@ void z_get_prop_len(void)
         // get location of property
         // apperenty location is location of actual property data, not location of preceding size byte
         // fix unsure what location represents, might be a object number in the object table.
-        location = zorkData[programCounter++] - 1;
+        location = data_loadByte(programCounter++) - 1;
         // get location to store result
-        store = zorkData[programCounter++];
+        store = data_loadByte(programCounter++);
 
         // get actual value
         //addr = zargs[0] - 1;
-        value = zorkData[location];
+        value = data_loadByte(location);
 
         /* Calculate length of property */
 
@@ -825,8 +803,9 @@ void z_storew(void)
     short wordIndex = operands[1];
     short value = operands[2];
 
-    zorkData[array + 2 * wordIndex] = (value >> 8); 
-    zorkData[(array + 2 * wordIndex) + 1] = (value & 0xFF); 
+    //zorkData[array + 2 * wordIndex] = (value >> 8); 
+    //zorkData[(array + 2 * wordIndex) + 1] = (value & 0xFF);
+    data_saveWord(array + 2 * wordIndex, value); 
 }
 
 
@@ -882,7 +861,7 @@ void z_loadb(void)
     array = operands[0];
     byteIndex = operands[1];
 
-    value = zorkData[array + byteIndex];
+    value = data_loadByte(array + byteIndex);
     storeResult(value);
 }
 
@@ -900,7 +879,7 @@ void z_loadw(void)
     array = operands[0];
     wordIndex = operands[1];
 
-    value = (zorkData[array + 2 * wordIndex] << 8) + zorkData[(array + 2 * wordIndex) + 1];    
+    value = data_loadWord(array + 2 * wordIndex);    
     storeResult(value);
 }
 
@@ -924,7 +903,7 @@ void z_put_prop(void)
     }
 
     /* Property id is in bottom five or six bits */
-    propertyNumberMask = (zorkHeader->version <= 3) ? 0x1f : 0x3f;
+    propertyNumberMask = (zorkHeader.version <= 3) ? 0x1f : 0x3f;
 
     /* Load address of first property */
     propertyAdress = objecttable_getFirstPropertyAddress(operands[0]);
@@ -932,7 +911,7 @@ void z_put_prop(void)
     /* Scan down the property list */
     for (;;) 
     {
-	    value = zorkData[propertyAdress];
+	    value = data_loadByte(propertyAdress);
 	    if ((value & propertyNumberMask) <= operands[1])
 	        break;
 	    propertyAdress = objecttable_getNextPropertyAddress(propertyAdress);
@@ -949,14 +928,16 @@ void z_put_prop(void)
     // skip the length byte V1+
     propertyAdress++;
 
-    if ((zorkHeader->version <= 3 && !(value & 0xe0)) || (zorkHeader->version >= 4 && !(value & 0xc0))) 
+    if ((zorkHeader.version <= 3 && !(value & 0xe0)) || (zorkHeader.version >= 4 && !(value & 0xc0))) 
     {
-	    zorkData[propertyAdress] = operands[2] & 0xFF;
+	    //zorkData[propertyAdress] = operands[2] & 0xFF;
+        data_saveByte(propertyAdress, operands[2]);
     } 
     else 
     {
-	    zorkData[propertyAdress] = (operands[2] >>8);
-        zorkData[propertyAdress + 1] = operands[2] & 0xFF;
+	    //zorkData[propertyAdress] = (operands[2] >>8);
+        //zorkData[propertyAdress + 1] = operands[2] & 0xFF;
+        data_saveWord(propertyAdress, operands[2]);
     }
 }
 
@@ -1137,7 +1118,7 @@ In Version 6, the stack in question may be specified as a user one: otherwise it
 */
 void z_pull(void)
 {
-    if (zorkHeader->version < 6)
+    if (zorkHeader.version < 6)
     {
         storeVariable(operands[0], stack_pop(stack));
     }

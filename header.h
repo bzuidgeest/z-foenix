@@ -40,7 +40,9 @@ struct header
 
 };
 
-extern struct header *zorkHeader;
+//extern struct header *zorkHeader;
+
+void header_initialise(char *filename);
 
 ushort getRelease(void);
 ushort getInitialProgramCounter(void);
