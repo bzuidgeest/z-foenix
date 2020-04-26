@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef STACK_H
+#define STACK_H
+
 //https://www.techiedelight.com/stack-implementation/
 
 // Data structure for stack
@@ -32,3 +35,5 @@ short stack_peek(struct stack *pt);
 
 // Utility function to pop top element from the stack
 short stack_pop(struct stack *pt);
+
+#endif /* STACK_H */

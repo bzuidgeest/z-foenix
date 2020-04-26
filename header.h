@@ -1,7 +1,9 @@
 #define SWAP16(x) (x>>8) | (x<<8)
 
-typedef unsigned short ushort;
-typedef unsigned char byte;
+#ifndef HEADER_H
+#define HEADER_H
+
+#include "../foenixLibrary/mytypes.h"
 
 struct header
 {
@@ -55,3 +57,5 @@ ushort getAbbreviationsLocation(void);
 ushort getAlphabetTableAddress(void);
 ushort getRoutineOffset(void);
 ushort getStringOffset(void);
+
+#endif /* HEADER_H */

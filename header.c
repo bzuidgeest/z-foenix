@@ -2,31 +2,48 @@
 #include <stdio.h>
 #include <stdlib.h> 
 #include "header.h"
+#include "../foenixLibrary/fatfs/ff.h"
 
 struct header* zorkHeader;
 
+extern FATFS FatFs;	/* Work area (filesystem object) for logical drive */
+FILE headerFile;
+
 void header_initialise(char *filename)
 {
-    FILE *zFile;
-    zorkHeader = malloc(sizeof(*zorkHeader));
-
-    zFile = fopen(filename, "rb");
+	FRESULT fr = 0; 
+	UINT bytesRead = 0;
+	ushort temp = 0;
     
-    /* make sure we are at the start of the file */
-    fseek(zFile, 0, SEEK_SET);
+	zorkHeader = malloc(sizeof(*zorkHeader));
+
+ 	fr = f_mount(&FatFs, "1:", 0);
+    fr = f_open(&headerFile, filename, FA_READ);
+    if (fr)
+	{
+		printf("Error %d opening header\n", (int)fr);
+	} 
+
+	/* make sure we are at the start of the file */
+	f_lseek(&headerFile, 0);
     
     /* read data archive into array */
-    int bytesRead = fread(zorkHeader, sizeof(struct header), 1, zFile);
-    
-    if (bytesRead == 1)
-        printf("File read succesfully");
+    f_read(&headerFile, zorkHeader, sizeof(struct header), &bytesRead);
+
+    if (bytesRead == sizeof(struct header))
+	{
+        printf("File read succesfully\n");
+	}
     else
     {
-        printf("I could only read %d bytes.", bytesRead);
+        printf("Iz could only read %d of %d bytes.\n", bytesRead, sizeof(struct header));
         exit(1);
     }
 
-    fclose(zFile);
+    f_close(&headerFile);
+	f_mount(0, "1:", 0);
+	
+	return;
 }
 
 ushort getRelease()

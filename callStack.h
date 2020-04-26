@@ -1,10 +1,11 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h> 
-#include <sys/stat.h>
+//#include <sys/stat.h>
 #include <sys/types.h>
 
-
+#ifndef CALLSTACK_H
+#define CALLSTACK_H
 
 struct functionData
 {
@@ -33,3 +34,5 @@ functionData* callStack_top();
 int callStack_isEmpty();
 
 short callStack_Size(void);
+
+#endif /* CALLSTACK_H */

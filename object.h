@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h> 
 
-typedef unsigned short ushort;
-typedef unsigned char byte;
+#ifndef OBJECT_H
+#define OBJECT_H
+
+#include "../foenixLibrary/mytypes.h"
 
 ushort objecttableAddress;
 byte objecttableVersion;
@@ -31,3 +33,5 @@ ushort objecttable_getFirstPropertyAddress(ushort objectAddress);
 ushort objecttable_getNextPropertyAddress(ushort propertyAddress);
 void objecttable_insertObject(ushort sourceObjectNumber, ushort destinationObjectNumber);
 short objecttable_getPropertyShort(ushort objectNumber, ushort propertyNumber);
+
+#endif /* OBJECT_H */

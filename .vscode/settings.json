@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "zip.h": "c"
-    }
+		"zip.h": "c",
+		"stdio.h": "c",
+		"ff.h": "c"
+	}
 }

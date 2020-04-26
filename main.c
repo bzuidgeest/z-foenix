@@ -1,22 +1,76 @@
-#include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h> 
-#include <sys/stat.h>
 #include <sys/types.h>
 #include "header.h"
 #include "stack.h"
 #include "zip.h"
 #include "callStack.h"
 #include "data.h"
+#include "../foenixLibrary/mytypes.h"
+#include "../foenixLibrary/vicky.h"
+#include "../foenixLibrary/timer.h"
+#include "../foenixLibrary/interrupt.h"
 
 #define DEBUGx
+
+void *heap_start = (void * )0x190000, *heap_end = (void * )0x210000;
 
 //http://jiten-thakkar.com/posts/writing-generic-stack-in-c
 //https://www.techiedelight.com/introduction-linked-lists/
 //https://www.codesdope.com/blog/article/making-a-stack-using-linked-list-in-c/
 
-typedef u_int16_t ushort;
+void IRQHandler(void)              
+{          
+	// int reg = 0;
+
+	// if (reg = (INT_PENDING_REG0 & FNX0_INT02_TMR0))
+	// {
+		
+	// 	textScreen[6] = spinner[spinnerState];
+	// 	if (spinnerState < 7)
+	// 		spinnerState++;
+	// 	else
+	// 	{
+	// 		spinnerState = 0;
+	// 	}
+
+	// 	//disk_timerproc();
+
+	// 	reg = INT_PENDING_REG0 & FNX0_INT02_TMR0;
+	// 	INT_PENDING_REG0 = reg;
+	// }   
+
+	// if (reg = (INT_PENDING_REG3 & FNX3_INT02_IDE))
+	// {
+		
+	// 	textScreen[10] = spinner[spinnerStateDisk];
+	// 	if (spinnerStateDisk < 7)
+	// 		spinnerStateDisk++;
+	// 	else
+	// 	{
+	// 		spinnerStateDisk = 0;
+	// 	}
+
+	// 	printf("interrupt %d", IDE_CMD_STAT);
+
+	// 	reg = INT_PENDING_REG3 & INT_PENDING_REG3;
+	// 	INT_PENDING_REG3 = reg;
+	// }   
+
+	printf("interrupt");
+}
+
+void COPHandler(void)              
+{             
+	printf("COP");
+}
+
+void BRKHandler(void)              
+{             
+	//printf("break");
+	while(1) {};
+}
 
 void initialize(void);
 void gameLoop(void);
@@ -47,6 +101,25 @@ short globals[240];
 
 int main()
 {
+	// Emulator workarround for screen
+	//set the display size - 128 x 64
+	COLS_PER_LINE = 80;
+	LINES_MAX = 60;
+	//set the visible display size - 80 x 60
+  	COLS_VISIBLE = 80;
+	LINES_VISIBLE = 60;
+
+	//INT_MASK_REG0 = 0xFB; // unmask harddisk;
+
+	// enable interrupts
+	//enableInterrupts();
+
+	setEGATextPalette();
+	clearTextScreen(' ', 0xD, 0xE);
+
+	VKY_TXT_CURSOR_X_REG = 0;
+	VKY_TXT_CURSOR_Y_REG = 0;
+
     // Create the stack
     stack = stack_new(1024);
 
@@ -69,14 +142,15 @@ int main()
 */
     
     
-    printf("\n\n\n");
+    printf("Initialising....\n\n");
     // initialize stuff
 	initialize();
 
+	printf("Start main game loop.\n\n");
     // play game
     gameLoop();
 
-    //printf("Hello, World!");
+    printf("Exiting");
     return 0;
 } 
 
@@ -85,12 +159,17 @@ void initialize(void)
     byte i = 0;
 	ushort address = 0;
 	
-    header_initialise("/home/bart/ZIP/ZORK1.DAT");
-    data_initialise(getHighMemoryStart(), "/home/bart/ZIP/ZORK1.DAT");
+    // header_initialise("/home/bart/ZIP/ZORK1.DAT");
+    // data_initialise(getHighMemoryStart(), "/home/bart/ZIP/ZORK1.DAT");
+
+	printf("Reading header\n");
+	header_initialise("1:ZORK1.DAT");
+	printf("Reading data file\n");
+    data_initialise(getHighMemoryStart(), "1:ZORK1.DAT");
 
     // free data from initial load and retarget pointer to main data array
     free(zorkHeader);
-    zorkHeader = zData;
+    zorkHeader = (struct header *)zData;
 
     address = getGlobalVariableLocation();
 
@@ -748,11 +827,12 @@ void z_jz(void)
 
 void z_get_prop_len(void)
 {
-	printf("needs validation/completion");
-    u_int16_t location = 0;
-    u_int16_t store = 0;
+	ushort location = 0;
+    ushort store = 0;
     short value;
 
+	printf("needs validation/completion");
+    
     if (opcode = 0x94)
     {
         // get location of property
@@ -1257,3 +1337,87 @@ void z_read()
     printf("done");
     exit(1);
 }
+
+
+/* printf functions */
+
+void _abort(void) {
+
+}
+
+int close(int fd) {
+    return 0;
+}
+
+int creat(const char *_name, int _mode) {
+    return 0;
+}
+
+
+long lseek(int fd, long pos, int rel) {
+    return 0;
+}
+
+int open(const char * _name, int _mode) {
+    return 0;
+}
+
+size_t read(int fd, void *buffer, size_t len) {
+    return 0;
+}
+
+int unlink(const char *filename) {
+    return 0;
+}
+
+size_t write(int fd, void *buffer, size_t len) {
+    size_t count;
+	for (count = 0; count < len; count++)
+	{
+		if (((unsigned char *)buffer)[count] == '\n')
+		{
+			VKY_TXT_CURSOR_X_REG = 0;
+			VKY_TXT_CURSOR_Y_REG++;
+
+			if (VKY_TXT_CURSOR_Y_REG == LINES_VISIBLE)
+			{
+				VKY_TXT_CURSOR_Y_REG = 0;
+			}
+
+			continue;
+		}
+
+		textScreen[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = ((unsigned char *)buffer)[count];
+		
+		textScreenColor[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = 0xE0;
+		/*
+		textScreenColor[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = color;
+		color += 16;
+		if (color == 0xF0)
+			color = 0x10;*/
+		
+		VKY_TXT_CURSOR_X_REG++;
+		
+		if (VKY_TXT_CURSOR_X_REG == COLS_VISIBLE)
+		{
+			VKY_TXT_CURSOR_X_REG = 0;
+			VKY_TXT_CURSOR_Y_REG++;
+			
+			if (VKY_TXT_CURSOR_Y_REG == LINES_VISIBLE)
+			{
+				VKY_TXT_CURSOR_Y_REG = 0;
+			}
+		}
+	}
+    return len;
+}
+
+//
+// Missing STDLIB.H function
+//
+int    isatty(int fd) {
+    // descriptors 0, 1 and 2 are STDIN_FILENO, STDOUT_FILENO and STDERR_FILENO
+    return fd < 3;
+}
+
+/* end of printf functions */

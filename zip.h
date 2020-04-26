@@ -1,9 +1,6 @@
 
-
-typedef unsigned short ushort;
-typedef unsigned char byte;
-
-//u_int8_t *zorkData;
+#ifndef ZIP_H
+#define ZIP_H
 
 void z_add(void);
 void z_sub(void);
@@ -47,3 +44,4 @@ void returnfromRoutine(short returnValue);
 void branchTo(int value);
 void storeResult(short value);
 
+#endif /* ZIP_H */

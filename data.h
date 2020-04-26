@@ -1,9 +1,11 @@
 
+#ifndef DATA_H
+#define DATA_H
 
-typedef unsigned short ushort;
-typedef unsigned char byte;
+#include "../foenixLibrary/mytypes.h"
+#include "../foenixLibrary/fatfs/ff.h"
 
-extern byte *zData;
+extern BYTE *zData;
 
 void data_initialise(ushort highmemAddress, char *filename);
 void data_close();
@@ -11,5 +13,7 @@ void data_close();
 short data_loadWord(ushort address);
 void data_saveWord(ushort address, short value);
 
-byte data_loadByte(ushort address);
-void data_saveByte(ushort address, byte value);
+BYTE data_loadByte(ushort address);
+void data_saveByte(ushort address, BYTE value);
+
+#endif /* DATA_H */
