@@ -7,9 +7,9 @@
 
 #include "../foenixLibrary/mytypes.h"
 
-ushort objecttableAddress;
-byte objecttableVersion;
-ushort objectlistStart;
+// ushort objecttableAddress;
+// byte objecttableVersion;
+// ushort objectlistStart;
 
 void objecttable_initialize(ushort address, byte version);
 short objecttable_getDefaultProperty(short number);

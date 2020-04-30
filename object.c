@@ -7,6 +7,10 @@
 // Zork data
 //extern byte *zorkData;
 
+ushort objecttableAddress;
+byte objecttableVersion;
+ushort objectlistStart;
+
 /*
 12.1
 The object table is held in dynamic memory and its byte address is stored in the word at $0a in the header. (Recall that objects have flags 

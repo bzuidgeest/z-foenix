@@ -2,6 +2,7 @@
     "files.associations": {
 		"zip.h": "c",
 		"stdio.h": "c",
-		"ff.h": "c"
+		"ff.h": "c",
+		"vicky.h": "c"
 	}
 }

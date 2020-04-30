@@ -7,14 +7,21 @@
 #include "zip.h"
 #include "callStack.h"
 #include "data.h"
+#include "object.h"
 #include "../foenixLibrary/mytypes.h"
 #include "../foenixLibrary/vicky.h"
 #include "../foenixLibrary/timer.h"
 #include "../foenixLibrary/interrupt.h"
 
-#define DEBUGx
+#define DEBUG
 
 void *heap_start = (void * )0x190000, *heap_end = (void * )0x210000;
+
+
+#define UART1 (*(unsigned char *)0xAF13F8)
+#define UART1X (*(unsigned char *)0xAF13FD)
+char debugStringBuffer[200];
+int debugBufferLength = 0;
 
 //http://jiten-thakkar.com/posts/writing-generic-stack-in-c
 //https://www.techiedelight.com/introduction-linked-lists/
@@ -191,13 +198,17 @@ void initialize(void)
 void gameLoop()
 {
     byte tempByte;
+	#ifdef DEBUG
+	int i = 0;
+	#endif
 
     programCounter = getInitialProgramCounter();
     
     do
     {
         #ifdef DEBUG
-		printf("PC: %d,", programCounter);
+		debugBufferLength = sprintf(debugStringBuffer, "PC: %hu,", programCounter);
+		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
         instructionCount++;
@@ -205,12 +216,14 @@ void gameLoop()
         ReadInstruction();
 		
         #ifdef DEBUG
-        printf(" OPCODE: 0x%X (%d) instruction: %d\n", opcode, opcode, instructionCount);
+        debugBufferLength = sprintf(debugStringBuffer, " OPCODE: 0x%X (%d) instruction: %d\n", opcode, opcode, instructionCount);
+		write(3, debugStringBuffer, debugBufferLength);
 
-        int i = 0;
+        i = 0;
         while (operandType[i] != 3)
         {
-            printf("\tOperand %d value: %d(%d) type: %d\n", i, operands[i], (ushort)operands[i], operandType[i]);
+            debugBufferLength = sprintf(debugStringBuffer, "\tOperand %d value: %d(%hu) type: %d\n", i, operands[i], (ushort)operands[i], operandType[i]);
+			write(3, debugStringBuffer, debugBufferLength);
             i++;
         }
         #endif
@@ -596,7 +609,8 @@ void storeResult(short value)
     if (storeLocation == 0)
     {
         #ifdef DEBUG
-        printf("Storing %d (%d) to stack\n", value, (ushort)value, storeLocation);
+        debugBufferLength = sprintf(debugStringBuffer, "Storing %d (%d) to stack\n", value, (ushort)value, storeLocation);
+		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
         stack_push(stack, value);
@@ -604,7 +618,8 @@ void storeResult(short value)
     else if (storeLocation <= 15)
     {
         #ifdef DEBUG
-        printf("Storing local %d (%d)  to %d\n", value, (ushort)value, storeLocation);
+        debugBufferLength = sprintf(debugStringBuffer, "Storing local %d (%d)  to %d\n", value, (ushort)value, storeLocation);
+		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
         callStack_top()->locals[storeLocation - 1] = value;
@@ -612,7 +627,8 @@ void storeResult(short value)
     else
     {
         #ifdef DEBUG
-        printf("Storing global %d (%d) to %d\n", value, (ushort)value, storeLocation - 0x10);
+        debugBufferLength = sprintf(debugStringBuffer, "Storing global %d (%d) to %d\n", value, (ushort)value, storeLocation - 0x10);
+		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
         globals[storeLocation - 0x10] = value;
@@ -624,7 +640,8 @@ void storeVariable(short location, short value)
     if (location == 0)
     {
         #ifdef DEBUG
-        printf("Storing %d (%d) to stack\n", value, (ushort)value, location);
+        debugBufferLength = sprintf(debugStringBuffer, "Storing %d (%d) to stack\n", value, (ushort)value);
+		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
         stack_push(stack, value);
@@ -632,7 +649,8 @@ void storeVariable(short location, short value)
     else if (location <= 15)
     {
         #ifdef DEBUG
-        printf("Storing local %d (%d) to %d\n", value, (ushort)value, location);
+        sprintf(debugStringBuffer, "Storing local %d (%d) to %d\n", value, (ushort)value, location);
+		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
         callStack_top()->locals[location - 1] = value;
@@ -640,7 +658,8 @@ void storeVariable(short location, short value)
     else
     {
         #ifdef DEBUG
-        printf("Storing global %d (%d) to %d\n", value, (ushort)value, location - 0x10);
+        debugBufferLength = sprintf(debugStringBuffer, "Storing global %d (%d) to %d\n", value, (ushort)value, location - 0x10);
+		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
         globals[location - 0x10] = value;
@@ -694,12 +713,15 @@ void branchTo(int value)
 
 void returnfromRoutine(short returnValue)
 {
+	functionData returnFrom;
+
     #ifdef DEBUG
-    printf("return from: %d\n", callStack_Size());
+    debugBufferLength = sprintf(debugStringBuffer, "return from: %hu\r\n", callStack_Size());
+	write(3, debugStringBuffer, debugBufferLength);
     #endif
 
     // return to previous routing by popping the current one from the stack
-    functionData returnFrom = callStack_pop();
+    returnFrom = callStack_pop();
 
     // return program counter to previous value;
     programCounter = returnFrom.returnAddress;
@@ -795,7 +817,8 @@ void z_call_vs(void)
 
 
     #ifdef DEBUG
-    printf("Added frame: %d returnAddress: %d \n", callStack_Size(), top->data.returnAddress);
+    debugBufferLength = sprintf(debugStringBuffer, "Added frame: %d returnAddress: %hu \n", callStack_Size(), top->data.returnAddress);
+	write(3, debugStringBuffer, debugBufferLength);
     #endif
 }
 
@@ -1372,43 +1395,62 @@ int unlink(const char *filename) {
 
 size_t write(int fd, void *buffer, size_t len) {
     size_t count;
-	for (count = 0; count < len; count++)
-	{
-		if (((unsigned char *)buffer)[count] == '\n')
-		{
-			VKY_TXT_CURSOR_X_REG = 0;
-			VKY_TXT_CURSOR_Y_REG++;
 
-			if (VKY_TXT_CURSOR_Y_REG == LINES_VISIBLE)
+	if(fd < 3)
+	{
+		for (count = 0; count < len; count++)
+		{
+			if (((unsigned char *)buffer)[count] == '\n')
 			{
-				VKY_TXT_CURSOR_Y_REG = 0;
+				VKY_TXT_CURSOR_X_REG = 0;
+				VKY_TXT_CURSOR_Y_REG++;
+
+				if (VKY_TXT_CURSOR_Y_REG == LINES_VISIBLE)
+				{
+					VKY_TXT_CURSOR_Y_REG = 0;
+				}
+
+				continue;
 			}
 
-			continue;
-		}
-
-		textScreen[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = ((unsigned char *)buffer)[count];
-		
-		textScreenColor[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = 0xE0;
-		/*
-		textScreenColor[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = color;
-		color += 16;
-		if (color == 0xF0)
-			color = 0x10;*/
-		
-		VKY_TXT_CURSOR_X_REG++;
-		
-		if (VKY_TXT_CURSOR_X_REG == COLS_VISIBLE)
-		{
-			VKY_TXT_CURSOR_X_REG = 0;
-			VKY_TXT_CURSOR_Y_REG++;
+			textScreen[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = ((unsigned char *)buffer)[count];
 			
-			if (VKY_TXT_CURSOR_Y_REG == LINES_VISIBLE)
+			textScreenColor[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = 0xE0;
+			/*
+			textScreenColor[(0x80 * VKY_TXT_CURSOR_Y_REG) + VKY_TXT_CURSOR_X_REG] = color;
+			color += 16;
+			if (color == 0xF0)
+				color = 0x10;*/
+			
+			VKY_TXT_CURSOR_X_REG++;
+			
+			if (VKY_TXT_CURSOR_X_REG == COLS_VISIBLE)
 			{
-				VKY_TXT_CURSOR_Y_REG = 0;
+				VKY_TXT_CURSOR_X_REG = 0;
+				VKY_TXT_CURSOR_Y_REG++;
+				
+				if (VKY_TXT_CURSOR_Y_REG == LINES_VISIBLE)
+				{
+					VKY_TXT_CURSOR_Y_REG = 0;
+				}
 			}
 		}
 	}
+	else
+	{
+		// for (count = 0; count < len; count++)
+		// {
+		// 	UART1 = ((unsigned char *)buffer)[count];
+		// }
+		for (count = 0; count < len; count++)
+		{
+			while(!(UART1X & 0x20))
+			{
+			}
+			UART1 = ((unsigned char *)buffer)[count];
+		}
+	}
+	
     return len;
 }
 
