@@ -174,8 +174,8 @@ void initialize(void)
 	printf("Reading header\n");
 	header_initialise("1:ZORK1.DAT");
 	printf("Reading data file\n");
-    //data_initialise(getHighMemoryStart(), "1:ZORK1.DAT");
-	data_initialise(getStaticMemoryLocation(), "1:ZORK1.DAT");
+    data_initialise(getHighMemoryStart(), "1:ZORK1.DAT");
+	//data_initialise(getStaticMemoryLocation(), "1:ZORK1.DAT");
 
     // free data from initial load and retarget pointer to main data array
     free(zorkHeader);
@@ -777,10 +777,10 @@ void z_call_vs(void)
         storeResult(0);
         return;
     }
-	#ifdef DEBUG
-    debugBufferLength = sprintf(debugStringBuffer, "callx %d", callStack_Size());
-	write(3, debugStringBuffer, debugBufferLength);
-    #endif
+	// #ifdef DEBUG
+    // debugBufferLength = sprintf(debugStringBuffer, "callx %d", callStack_Size());
+	// write(3, debugStringBuffer, debugBufferLength);
+    // #endif
 	// New functiondata object to push on the callstack
     callStack_push();
 	//callStack_top()->locals = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -788,10 +788,10 @@ void z_call_vs(void)
 	// Read storage location and push on stack;
 	// do not read here, read after return
 	//fd.returnValueStorage = storeLocation; //zorkData[programCounter++];
-    	#ifdef DEBUG
-    debugBufferLength = sprintf(debugStringBuffer, "call %d", callStack_Size());
-	write(3, debugStringBuffer, debugBufferLength);
-    #endif
+    // 	#ifdef DEBUG
+    // debugBufferLength = sprintf(debugStringBuffer, "call %d", callStack_Size());
+	// write(3, debugStringBuffer, debugBufferLength);
+    // #endif
 	// Push return program counter to stack
 	callStack_top()->returnAddress = programCounter;
 
@@ -826,7 +826,7 @@ void z_call_vs(void)
 
 
     #ifdef DEBUG
-    debugBufferLength = sprintf(debugStringBuffer, "Added frame: %hd returnAddress: %hu \n", callStack_Size(), top->data.returnAddress);
+    debugBufferLength = sprintf(debugStringBuffer, "Added frame: %hd returnAddress: %hu \n", callStack_Size(), callStack_top()->returnAddress);
 	write(3, debugStringBuffer, debugBufferLength);
     #endif
 }

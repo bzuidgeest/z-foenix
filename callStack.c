@@ -2,63 +2,47 @@
 #include <stdlib.h>
 #include "callStack.h"
 
-node *top = NULL;
+//node *top = NULL;
+functionData callstack[25]; 
+short callstackIndex = -1;
 
 void callStack_initialize()
 {
-	//printf("zzzzzzz");
-    top = NULL;
 }
 
 //void callStack_push(functionData value)
 void callStack_push()
 {
-    node *tmp;
-
-    tmp = malloc(sizeof(node));
-	if (tmp == NULL)
+	callstackIndex++;
+	if (callstackIndex > 24 )
 	{
-		printf("malloc fail");
+		printf("Stack overflow");
 	}
-	
-    //tmp -> data = value;
-    tmp -> next = top;
-    if (top != NULL)
-    {
-		//printf("XXXXXXXXX");
-        tmp -> nodeCount = top -> nodeCount + 1;
-    }
-    else
-    {
-		//printf("yyyyyyyyyyy");
-        tmp -> nodeCount = 1;
-    }
-    
-    top = tmp;
+
 }
 
 functionData callStack_pop()
 {
-    node *tmp;
-    functionData n;
-    tmp = top;
-    n = tmp->data;
-    top = top->next;
-    free(tmp);
-    return n;
+	functionData data = callstack[callstackIndex];
+	if (callstackIndex < 0 )
+	{
+		printf("Stack underflow");
+	}
+	callstackIndex--;
+	return data;
 }
 
 functionData* callStack_top()
 {
-    return &(top->data);
+    return callstack + callstackIndex;
 }
 
 int callStack_isEmpty()
 {
-    return top==NULL;
+    return (callstackIndex == -1);
 }
 
 short callStack_Size()
 {
-    return top -> nodeCount;
+    return callstackIndex + 1;
 }

@@ -116,11 +116,6 @@ byte data_loadByte(ushort address)
     byte value = 0;
     UINT bytesRead = 0;
 
-	if (address == 36860)
-	{
-		printf("test: %X", zData[address]);
-	}
-
     if (address > data_highmemAddress)
     {
         //load from disk   
