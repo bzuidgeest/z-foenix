@@ -88,6 +88,7 @@ ushort objecttable_getObjectAddress(ushort number)
     {
         if (objecttableVersion <= 3)
         {
+			//printf ("\nobjectlistStart %d number %d",objectlistStart, number);
             // first object number is one, so minus one for zero index layout. 
             // V3 and lower have 9 bytes per entry
             return objectlistStart + (number - 1) * 9;
@@ -201,9 +202,10 @@ ushort objecttable_getObjectPropertyTableAddress(ushort objectNumber)
 {
     // get object address from object index
     ushort objectAddress = objecttable_getObjectAddress(objectNumber);
-
+	//printf("objectAddress: %d", objectAddress);
     if(objecttableVersion < 4)
     {
+		//printf("word: %d", data_loadWord(objectAddress + 7));
         return data_loadWord(objectAddress + 7);
     }
     else
@@ -270,10 +272,12 @@ char * objecttable_getObjectName(ushort objectNumber)
     char *name = readText(propertyTableAddress + 1, length);
     return *name;
 }*/
-
+// compiler problem
 ushort objecttable_getObjectNameAddress(ushort objectNumber)
 {
-    return objecttable_getObjectPropertyTableAddress(objectNumber) + 1;
+	ushort address = objecttable_getObjectPropertyTableAddress(objectNumber);
+	//printf("\naddress: %d, number:%d", objecttable_getObjectPropertyTableAddress(objectNumber), objectNumber);
+    return address + 1;
 }
 
 /*
@@ -310,8 +314,10 @@ bit 6 is either clear to indicate a property data length of 1, or set to indicat
 ushort objecttable_getFirstPropertyAddress(ushort objectNumber)
 {
     ushort propertytableAddress = objecttable_getObjectPropertyTableAddress(objectNumber);
+	ushort offset = data_loadByte(propertytableAddress) * 2 + 1;
+	//printf("propertytableAddress: %d %d %d\n",propertytableAddress, data_loadByte(propertytableAddress), data_loadByte(propertytableAddress) * 2 + 1);
     // First property of an object should be start of property table + the lenght byte of the object name + object name bytes.
-    return propertytableAddress + data_loadByte(propertytableAddress) * 2 + 1;
+    return propertytableAddress + offset;
 }
 
 ushort objecttable_getNextPropertyAddress(ushort propertyAddress)
@@ -379,6 +385,7 @@ short objecttable_getPropertyShort(ushort objectNumber, ushort propertyNumber)
 
     if (objecttableVersion <= 3)
     {
+		//printf("propertyaddress %d, mask: %x", propertyAddress, mask);
         while ((data_loadByte(propertyAddress) & mask) > propertyNumber && data_loadByte(propertyAddress) != 0)
         {
             propertyAddress = objecttable_getNextPropertyAddress(propertyAddress);

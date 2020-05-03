@@ -15,7 +15,7 @@
 
 #define DEBUG
 
-void *heap_start = (void * )0x190000, *heap_end = (void * )0x210000;
+void *heap_start = (void * )0x190000, *heap_end = (void * )0x220000;
 
 
 #define UART1 (*(unsigned char *)0xAF13F8)
@@ -75,7 +75,7 @@ void COPHandler(void)
 
 void BRKHandler(void)              
 {             
-	//printf("break");
+	printf("break");
 	while(1) {};
 }
 
@@ -127,6 +127,8 @@ int main()
 	VKY_TXT_CURSOR_X_REG = 0;
 	VKY_TXT_CURSOR_Y_REG = 0;
 
+	BORDER_X_SIZE = 0;
+	BORDER_Y_SIZE = 0;
     // Create the stack
     stack = stack_new(1024);
 
@@ -172,7 +174,8 @@ void initialize(void)
 	printf("Reading header\n");
 	header_initialise("1:ZORK1.DAT");
 	printf("Reading data file\n");
-    data_initialise(getHighMemoryStart(), "1:ZORK1.DAT");
+    //data_initialise(getHighMemoryStart(), "1:ZORK1.DAT");
+	data_initialise(getStaticMemoryLocation(), "1:ZORK1.DAT");
 
     // free data from initial load and retarget pointer to main data array
     free(zorkHeader);
@@ -207,7 +210,7 @@ void gameLoop()
     do
     {
         #ifdef DEBUG
-		debugBufferLength = sprintf(debugStringBuffer, "PC: %hu,", programCounter);
+		debugBufferLength = sprintf(debugStringBuffer, "\nPC: %hu,", programCounter);
 		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
@@ -609,7 +612,7 @@ void storeResult(short value)
     if (storeLocation == 0)
     {
         #ifdef DEBUG
-        debugBufferLength = sprintf(debugStringBuffer, "Storing %d (%d) to stack\n", value, (ushort)value, storeLocation);
+        debugBufferLength = sprintf(debugStringBuffer, "Storing %d (%hu) to stack\n", value, (ushort)value, storeLocation);
 		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
@@ -618,7 +621,7 @@ void storeResult(short value)
     else if (storeLocation <= 15)
     {
         #ifdef DEBUG
-        debugBufferLength = sprintf(debugStringBuffer, "Storing local %d (%d)  to %d\n", value, (ushort)value, storeLocation);
+        debugBufferLength = sprintf(debugStringBuffer, "Storing local %d (%hu)  to %d\n", value, (ushort)value, storeLocation);
 		write(3, debugStringBuffer, debugBufferLength);
         #endif
 
@@ -774,7 +777,10 @@ void z_call_vs(void)
         storeResult(0);
         return;
     }
-
+	#ifdef DEBUG
+    debugBufferLength = sprintf(debugStringBuffer, "callx %d", callStack_Size());
+	write(3, debugStringBuffer, debugBufferLength);
+    #endif
 	// New functiondata object to push on the callstack
     callStack_push();
 	//callStack_top()->locals = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -782,18 +788,21 @@ void z_call_vs(void)
 	// Read storage location and push on stack;
 	// do not read here, read after return
 	//fd.returnValueStorage = storeLocation; //zorkData[programCounter++];
-    
+    	#ifdef DEBUG
+    debugBufferLength = sprintf(debugStringBuffer, "call %d", callStack_Size());
+	write(3, debugStringBuffer, debugBufferLength);
+    #endif
 	// Push return program counter to stack
 	callStack_top()->returnAddress = programCounter;
 
 	// Push current stackDepth to stack and set to zero
 	callStack_top()->returnStackSize = stack_size(stack);
-	
+
 	// read number of locals in routine
 	// fix packed addressess implement 1.2.3 here 
 	x = data_loadByte(operands[0] << 1); // (left shift 1 gives *2)
 	//fd.locals = malloc(x * 2); // times two as short is two bytes per item
-	
+
     // Clear and load locals from routine header
 	//memset(fd.locals, 0, x * 2);
     memset(callStack_top()->locals, 0, 15 * 2);
@@ -817,7 +826,7 @@ void z_call_vs(void)
 
 
     #ifdef DEBUG
-    debugBufferLength = sprintf(debugStringBuffer, "Added frame: %d returnAddress: %hu \n", callStack_Size(), top->data.returnAddress);
+    debugBufferLength = sprintf(debugStringBuffer, "Added frame: %hd returnAddress: %hu \n", callStack_Size(), top->data.returnAddress);
 	write(3, debugStringBuffer, debugBufferLength);
     #endif
 }
@@ -1086,6 +1095,7 @@ Print the quoted (literal) Z-encoded string.
 */
 void z_printf(void)
 {
+	//printf("\nprint literal: %d", instructionCount);
     programCounter += text_printLiteral(programCounter);
 }
 
@@ -1262,6 +1272,7 @@ not a property). If the object number is invalid, the interpreter should halt wi
 */
 void z_print_obj(void)
 {
+	//printf("\nprint object: %d, %d \n", instructionCount,objecttable_getObjectNameAddress(operands[0]));
     text_printLiteral(objecttable_getObjectNameAddress(operands[0]));
 }
 

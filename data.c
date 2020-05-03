@@ -97,7 +97,7 @@ short data_loadWord(ushort address)
 
 void data_saveWord(ushort address, short value)
 {
-     if (address > data_highmemAddress)
+    if (address > data_highmemAddress)
     {
         //save to disk
         printf("should not happen, on disk part is read only!");
@@ -116,15 +116,22 @@ byte data_loadByte(ushort address)
     byte value = 0;
     UINT bytesRead = 0;
 
+	if (address == 36860)
+	{
+		printf("test: %X", zData[address]);
+	}
+
     if (address > data_highmemAddress)
     {
         //load from disk   
         f_lseek(&zFile, address);
         f_read(&zFile, &value, 1, &bytesRead); 
+
         return value;
     }
     else
     {
+		//printf("\nmem address: %d",address);
         //load from memory
         return zData[address];
     }

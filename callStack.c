@@ -2,10 +2,11 @@
 #include <stdlib.h>
 #include "callStack.h"
 
-node *top;
+node *top = NULL;
 
 void callStack_initialize()
 {
+	//printf("zzzzzzz");
     top = NULL;
 }
 
@@ -13,15 +14,23 @@ void callStack_initialize()
 void callStack_push()
 {
     node *tmp;
+
     tmp = malloc(sizeof(node));
+	if (tmp == NULL)
+	{
+		printf("malloc fail");
+	}
+	
     //tmp -> data = value;
     tmp -> next = top;
     if (top != NULL)
     {
+		//printf("XXXXXXXXX");
         tmp -> nodeCount = top -> nodeCount + 1;
     }
     else
     {
+		//printf("yyyyyyyyyyy");
         tmp -> nodeCount = 1;
     }
     

@@ -14,3 +14,4 @@ wdc816cc -ML -Ic:\wdc\projects\foenixLibrary\fatfs data.c
 
 wdcln -HIE -T  -P00 main.obj header.obj stack.obj callStack.obj object.obj text.obj data.obj fxloader.obj -L../foenixLibrary/FMX -LML -LCL -O zmachine.hex -C10000  -D20000
 
+rem wdc816cc -AT -ML -Ic:\wdc\projects\foenixLibrary\fatfs object.c
